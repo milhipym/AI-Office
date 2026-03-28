@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Office - 가상 AI 오피스</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo pixel-border">
+                <span class="logo-icon">&#9632;&#9632;&#9632;</span>
+                <span class="logo-text">AI OFFICE</span>
+            </div>
+            <span class="header-subtitle">월급 0원으로 직원 6명 운영 중</span>
+        </div>
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="office">
+                <span class="tab-icon">&#9820;</span> 사무실
+            </button>
+            <button class="nav-tab" data-tab="chat">
+                <span class="tab-icon">&#9993;</span> 팀 채팅
+            </button>
+            <button class="nav-tab" data-tab="org">
+                <span class="tab-icon">&#9733;</span> 조직도
+            </button>
+            <button class="nav-tab" data-tab="customize">
+                <span class="tab-icon">&#9998;</span> 사무실 편집
+            </button>
+        </nav>
+        <div class="header-right">
+            <div class="status-indicator">
+                <span class="status-dot online"></span>
+                <span>직원 6명 근무 중</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- ===== OFFICE VIEW ===== -->
+        <section id="tab-office" class="tab-content active">
+            <div class="office-container">
+                <div class="office-grid" id="officeGrid">
+                    <!-- Rooms will be rendered here -->
+                </div>
+                <!-- Agent Info Panel -->
+                <div class="agent-info-panel" id="agentInfoPanel">
+                    <div class="panel-header">
+                        <h3>직원 정보</h3>
+                        <button class="close-btn" id="closePanel">&times;</button>
+                    </div>
+                    <div class="panel-body" id="panelBody">
+                        <p class="panel-hint">캐릭터를 클릭하면 정보가 표시됩니다</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Agent Status Bar -->
+            <div class="agent-status-bar" id="agentStatusBar">
+                <!-- Agent status cards -->
+            </div>
+        </section>
+
+        <!-- ===== CHAT VIEW ===== -->
+        <section id="tab-chat" class="tab-content">
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <h3 class="sidebar-title">참여 에이전트</h3>
+                    <div class="chat-agents" id="chatAgents">
+                        <!-- Agent list -->
+                    </div>
+                </div>
+                <div class="chat-main">
+                    <div class="chat-header-bar">
+                        <span class="chat-room-name"># 전체 채널</span>
+                        <span class="chat-room-desc">AI 직원들의 업무 소통 채널</span>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- Messages -->
+                    </div>
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <input type="text" id="chatInput" placeholder="지시사항을 입력하세요..." class="chat-input">
+                            <button id="sendBtn" class="send-btn">
+                                <span>&#9654;</span>
+                            </button>
+                        </div>
+                        <p class="chat-hint">지시만 내리면 AI 직원들이 알아서 처리합니다</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ORG CHART VIEW ===== -->
+        <section id="tab-org" class="tab-content">
+            <div class="org-container">
+                <h2 class="org-title">AI Organization Blueprint v2.1</h2>
+                <p class="org-subtitle">내맘대로 조직도 구성</p>
+                <div class="org-chart" id="orgChart">
+                    <!-- Org chart rendered by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CUSTOMIZE VIEW ===== -->
+        <section id="tab-customize" class="tab-content">
+            <div class="customize-container">
+                <div class="customize-toolbar">
+                    <h3>도구모음</h3>
+                    <div class="furniture-categories" id="furnitureCategories">
+                        <!-- Categories -->
+                    </div>
+                    <div class="furniture-items" id="furnitureItems">
+                        <!-- Items -->
+                    </div>
+                </div>
+                <div class="customize-preview">
+                    <div class="preview-header">
+                        <span class="pixel-badge">&#9998; 사무실 편집</span>
+                        <button class="save-btn" id="saveOffice">저장하기</button>
+                    </div>
+                    <div class="customize-grid" id="customizeGrid">
+                        <!-- Editable office grid -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
