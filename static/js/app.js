@@ -411,7 +411,118 @@ function preRenderAgentSprites() {
                 AGENT_SPRITES[agent.id][dir].push(offCanvas);
             });
         });
+
+        // Pre-render seated poses (one per direction)
+        directions.forEach(dir => {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = Math.round(sprW * DPR);
+            offCanvas.height = Math.round(sprH * DPR);
+            const offCtx = offCanvas.getContext('2d');
+            offCtx.scale(DPR, DPR);
+            offCtx.imageSmoothingEnabled = false;
+            drawCharacterSitting(offCtx, colors, dir, sprW, sprH);
+            AGENT_SPRITES[agent.id]['sit_' + dir] = offCanvas;
+        });
     });
+}
+
+// Draw a character in sitting pose (shorter legs, no arm swing)
+function drawCharacterSitting(ctx, colors, direction, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = false;
+    const cx = Math.floor(w / 2);
+    const hs = colors.hairStyle || 'short';
+
+    // No shadow (sitting on chair)
+    // === LEGS (bent, shorter) ===
+    const legY = h - 6;
+    ctx.fillStyle = colors.pants;
+    ctx.fillRect(cx - 4, legY - 3, 3, 6);
+    ctx.fillRect(cx + 1, legY - 3, 3, 6);
+    // Shoes
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(cx - 5, h - 2, 4, 2);
+    ctx.fillRect(cx + 1, h - 2, 4, 2);
+
+    // === BODY (slightly lower since seated) ===
+    const bodyY = legY - 12;
+    ctx.fillStyle = colors.shirt;
+    ctx.fillRect(cx - 6, bodyY, 12, 11);
+    const shirtShade = darken(colors.shirt, 20);
+    ctx.fillStyle = shirtShade;
+    ctx.fillRect(cx + 3, bodyY + 1, 3, 9);
+    const shirtHi = lighten(colors.shirt, 20);
+    ctx.fillStyle = shirtHi;
+    ctx.fillRect(cx - 5, bodyY + 1, 2, 5);
+    // Collar
+    ctx.fillStyle = lighten(colors.shirt, 40);
+    ctx.fillRect(cx - 3, bodyY, 6, 2);
+
+    // === ARMS (forward, typing pose) ===
+    ctx.fillStyle = colors.shirt;
+    if (direction === 'down' || direction === 'up') {
+        // Arms forward
+        ctx.fillRect(cx - 9, bodyY + 3, 4, 6);
+        ctx.fillRect(cx + 5, bodyY + 3, 4, 6);
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(cx - 9, bodyY + 8, 3, 3);
+        ctx.fillRect(cx + 6, bodyY + 8, 3, 3);
+    } else {
+        // Side view — one arm visible, extended forward
+        ctx.fillRect(cx - 7, bodyY + 2, 4, 7);
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(cx - 7, bodyY + 8, 3, 3);
+    }
+
+    // === HEAD ===
+    const headY = bodyY - 11;
+    ctx.fillStyle = colors.skin;
+    ctx.fillRect(cx - 6, headY, 12, 11);
+    const skinShade = darken(colors.skin, 15);
+    ctx.fillStyle = skinShade;
+    ctx.fillRect(cx + 3, headY + 2, 3, 7);
+
+    // === HAIR (reuse same hair drawing logic) ===
+    ctx.fillStyle = colors.hair;
+    const hairHi = lighten(colors.hair, 30);
+    // Simplified hair for sitting (just top)
+    ctx.fillRect(cx - 7, headY - 2, 14, 5);
+    if (hs === 'long' || hs === 'wavy') {
+        ctx.fillRect(cx - 8, headY + 1, 3, 8);
+        ctx.fillRect(cx + 5, headY + 1, 3, 8);
+    } else if (hs === 'ponytail') {
+        ctx.fillRect(cx + 5, headY - 3, 3, 3);
+        ctx.fillRect(cx + 6, headY - 1, 3, 8);
+    } else if (hs === 'spiky') {
+        ctx.fillRect(cx - 4, headY - 5, 3, 4);
+        ctx.fillRect(cx + 1, headY - 4, 3, 3);
+    }
+    ctx.fillStyle = hairHi;
+    ctx.fillRect(cx - 5, headY - 1, 6, 2);
+
+    // === FACE ===
+    if (direction === 'down' || direction === undefined) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(cx - 4, headY + 3, 3, 3);
+        ctx.fillRect(cx + 1, headY + 3, 3, 3);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(cx - 3, headY + 4, 2, 2);
+        ctx.fillRect(cx + 2, headY + 4, 2, 2);
+        ctx.fillStyle = '#c07060';
+        ctx.fillRect(cx - 1, headY + 8, 3, 1);
+    } else if (direction === 'up') {
+        ctx.fillStyle = colors.hair;
+        ctx.fillRect(cx - 6, headY + 2, 12, 7);
+    } else {
+        // Left or right profile
+        const ex = direction === 'left' ? cx - 4 : cx + 1;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(ex, headY + 3, 3, 3);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(ex + (direction === 'left' ? 0 : 1), headY + 4, 2, 2);
+        ctx.fillStyle = '#c07060';
+        ctx.fillRect(ex, headY + 8, 2, 1);
+    }
 }
 
 // ===== CANVAS DRAWING ENGINE =====
@@ -609,11 +720,17 @@ function drawOffice() {
         const px = anim.x * TILE_SIZE + (TILE_SIZE - sprW) / 2;
         const py = anim.y * TILE_SIZE + TILE_SIZE - sprH - 2;
 
-        // Draw character sprite — explicit dest size so DPR-buffer renders 1:1 at physical pixels
+        // Draw character sprite — seated or walking
         if (sprites) {
-            const dirSprites = sprites[anim.direction] || sprites['down'];
-            const frameIdx = anim.walking ? animFrame : 0;
-            const sprite = dirSprites[frameIdx];
+            let sprite;
+            if (anim.sitting) {
+                // Use seated pose
+                sprite = sprites['sit_' + anim.direction] || sprites['sit_down'];
+            } else {
+                const dirSprites = sprites[anim.direction] || sprites['down'];
+                const frameIdx = anim.walking ? animFrame : 0;
+                sprite = dirSprites[frameIdx];
+            }
             if (sprite) {
                 ctx.drawImage(sprite, px, py, sprW, sprH);
             }
@@ -1283,6 +1400,9 @@ function drawFurniturePixel(ctx, type, x, y) {
 }
 
 // ===== AGENT MOVEMENT SYSTEM =====
+// ===== BEHAVIOR-DRIVEN AGENT SYSTEM =====
+// Agents have behaviors: 'idle' (wander/coffee), 'working' (sit at desk), 'meeting' (go to meeting room)
+
 function initAgentAnims() {
     state.agents.forEach(agent => {
         agentAnims[agent.id] = {
@@ -1292,10 +1412,70 @@ function initAgentAnims() {
             targetY: agent.position.y,
             direction: agent.direction || 'down',
             walking: false,
-            walkTimer: 0,
+            sitting: false,       // true when seated at desk
+            behavior: 'idle',     // 'idle' | 'working' | 'meeting' | 'coffee'
+            behaviorTimer: 3000 + Math.random() * 5000,
+            deskTile: null,       // {x,y} of assigned desk when working
             idleTimer: 2000 + Math.random() * 6000,
         };
     });
+}
+
+// Find tiles with a specific furniture type
+function findFurnitureTiles(furnitureType) {
+    const tiles = [];
+    Object.entries(state.placedItems).forEach(([key, type]) => {
+        if (type === furnitureType) {
+            const [col, row] = key.split(',').map(Number);
+            tiles.push({ x: col, y: row });
+        }
+    });
+    return tiles;
+}
+
+// Find tiles in a specific room type
+function findRoomTiles(roomType) {
+    const tiles = [];
+    for (let row = 0; row < state.layout.length; row++) {
+        for (let col = 0; col < (state.layout[row]?.length || 0); col++) {
+            if (state.layout[row][col] === roomType) tiles.push({ x: col, y: row });
+        }
+    }
+    return tiles;
+}
+
+// Find the nearest unoccupied tile from a list
+function findNearestUnoccupied(tiles, fromX, fromY, agentId) {
+    let best = null, bestDist = Infinity;
+    for (const t of tiles) {
+        const occupied = state.agents.some(other => {
+            if (other.id === agentId) return false;
+            const oa = agentAnims[other.id];
+            return oa && Math.round(oa.targetX) === t.x && Math.round(oa.targetY) === t.y;
+        });
+        if (occupied) continue;
+        const d = Math.abs(t.x - fromX) + Math.abs(t.y - fromY);
+        if (d < bestDist) { bestDist = d; best = t; }
+    }
+    return best;
+}
+
+// Find adjacent walkable tile next to a furniture tile (for sitting near desk)
+function findAdjacentWalkable(fx, fy, agentId) {
+    const dirs = [{dx:0,dy:1},{dx:0,dy:-1},{dx:-1,dy:0},{dx:1,dy:0}];
+    for (const d of dirs) {
+        const nx = fx + d.dx, ny = fy + d.dy;
+        const cell = state.layout[ny]?.[nx];
+        if (!cell || cell === 'wall') continue;
+        // Check not occupied by another agent
+        const occupied = state.agents.some(other => {
+            if (other.id === agentId) return false;
+            const oa = agentAnims[other.id];
+            return oa && Math.round(oa.targetX) === nx && Math.round(oa.targetY) === ny;
+        });
+        if (!occupied) return { x: nx, y: ny, faceX: fx, faceY: fy };
+    }
+    return null;
 }
 
 function updateAgentPositions(dt) {
@@ -1303,18 +1483,29 @@ function updateAgentPositions(dt) {
         const anim = agentAnims[agent.id];
         if (!anim) return;
 
-        const speed = 0.02; // tiles per ms
+        // Sync behavior with status
+        const newBehavior = agent.status === 'working' ? 'working'
+            : agent.status === 'meeting' ? 'meeting' : 'idle';
+
+        // Behavior changed → trigger transition
+        if (anim.behavior !== newBehavior) {
+            anim.behavior = newBehavior;
+            anim.sitting = false;
+            anim.deskTile = null;
+            assignBehaviorTarget(agent, anim);
+        }
+
+        const speed = 0.025;
         const dx = anim.targetX - anim.x;
         const dy = anim.targetY - anim.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist > 0.05) {
             anim.walking = true;
+            anim.sitting = false;
             const move = Math.min(speed * dt, dist);
             anim.x += (dx / dist) * move;
             anim.y += (dy / dist) * move;
-
-            // Update direction
             if (Math.abs(dx) > Math.abs(dy)) {
                 anim.direction = dx > 0 ? 'right' : 'left';
             } else {
@@ -1325,34 +1516,122 @@ function updateAgentPositions(dt) {
             anim.y = anim.targetY;
             anim.walking = false;
 
-            // Idle timer for random movement
-            anim.idleTimer -= dt;
-            if (anim.idleTimer <= 0) {
-                anim.idleTimer = 4000 + Math.random() * 8000;
-                randomWalk(agent, anim);
+            if (anim.behavior === 'working' && anim.deskTile) {
+                // Arrived at desk → sit down, face the desk
+                anim.sitting = true;
+                const dxD = anim.deskTile.x - anim.x;
+                const dyD = anim.deskTile.y - anim.y;
+                if (Math.abs(dxD) > Math.abs(dyD)) {
+                    anim.direction = dxD > 0 ? 'right' : 'left';
+                } else {
+                    anim.direction = dyD > 0 ? 'down' : 'up';
+                }
+            } else if (anim.behavior === 'meeting') {
+                // In meeting room — face center, sit
+                anim.sitting = true;
+            } else {
+                // Idle/coffee — wander periodically
+                anim.idleTimer -= dt;
+                if (anim.idleTimer <= 0) {
+                    anim.idleTimer = 4000 + Math.random() * 8000;
+                    if (Math.random() < 0.3) {
+                        // Occasionally go toward coffee or gather
+                        assignIdleTarget(agent, anim);
+                    } else {
+                        randomWalk(agent, anim);
+                    }
+                }
             }
         }
     });
 }
 
+function assignBehaviorTarget(agent, anim) {
+    if (anim.behavior === 'working') {
+        // Find nearest desk, walk to adjacent tile
+        const desks = findFurnitureTiles('desk');
+        const monitors = findFurnitureTiles('monitor');
+        const workstations = [...desks, ...monitors];
+        // Prefer desk in agent's team room
+        const teamRoom = agent.team === 'build' ? 'dev'
+            : agent.team === 'content' ? 'cont'
+            : agent.team === 'academy' ? 'acad'
+            : agent.team === 'management' ? 'exec' : 'main';
+        const teamDesks = workstations.filter(t => state.layout[t.y]?.[t.x] === teamRoom);
+        const pool = teamDesks.length > 0 ? teamDesks : workstations;
+
+        for (const desk of pool.sort(() => Math.random() - 0.5)) {
+            const spot = findAdjacentWalkable(desk.x, desk.y, agent.id);
+            if (spot) {
+                anim.targetX = spot.x;
+                anim.targetY = spot.y;
+                anim.deskTile = { x: spot.faceX, y: spot.faceY };
+                return;
+            }
+        }
+        // Fallback: just stay
+    } else if (anim.behavior === 'meeting') {
+        // Go to meeting room
+        const meetTiles = findRoomTiles('meet');
+        const spot = findNearestUnoccupied(meetTiles, Math.round(anim.x), Math.round(anim.y), agent.id);
+        if (spot) {
+            anim.targetX = spot.x;
+            anim.targetY = spot.y;
+        }
+    } else {
+        // Idle — let normal wander happen
+        anim.idleTimer = 1000;
+    }
+}
+
+function assignIdleTarget(agent, anim) {
+    const roll = Math.random();
+    if (roll < 0.4) {
+        // Go near coffee machine
+        const coffees = findFurnitureTiles('coffee');
+        if (coffees.length > 0) {
+            const coffee = coffees[Math.floor(Math.random() * coffees.length)];
+            const spot = findAdjacentWalkable(coffee.x, coffee.y, agent.id);
+            if (spot) {
+                anim.targetX = spot.x;
+                anim.targetY = spot.y;
+                return;
+            }
+        }
+    } else if (roll < 0.6) {
+        // Go near another idle agent (socialize)
+        const idleAgents = state.agents.filter(a =>
+            a.id !== agent.id && a.status === 'idle' && agentAnims[a.id]
+        );
+        if (idleAgents.length > 0) {
+            const buddy = idleAgents[Math.floor(Math.random() * idleAgents.length)];
+            const ba = agentAnims[buddy.id];
+            const spot = findAdjacentWalkable(Math.round(ba.x), Math.round(ba.y), agent.id);
+            if (spot) {
+                anim.targetX = spot.x;
+                anim.targetY = spot.y;
+                return;
+            }
+        }
+    }
+    // Default: random walk
+    randomWalk(agent, anim);
+}
+
 function randomWalk(agent, anim) {
-    // Pick a random adjacent walkable tile
     const dirs = [
         { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
         { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
     ];
     const shuffled = dirs.sort(() => Math.random() - 0.5);
-
     for (const dir of shuffled) {
         const nx = Math.round(anim.x) + dir.dx;
         const ny = Math.round(anim.y) + dir.dy;
-
         const layoutRows = state.layout.length;
         const layoutCols = state.layout[0]?.length || COLS;
         if (ny >= 0 && ny < layoutRows && nx >= 0 && nx < layoutCols) {
             const tileType = state.layout[ny]?.[nx];
             if (tileType && tileType !== 'wall') {
-                // Check if another agent is at this position
                 const occupied = state.agents.some(other => {
                     if (other.id === agent.id) return false;
                     const otherAnim = agentAnims[other.id];
@@ -2229,18 +2508,33 @@ async function saveOfficeLayout() {
 
 // ===== AMBIENT BEHAVIORS =====
 function startAmbientBehaviors() {
-    // Random speech bubbles
+    // Context-aware speech bubbles based on behavior
     setInterval(() => {
         const agent = state.agents[Math.floor(Math.random() * state.agents.length)];
-        if (agent) {
-            const bubbles = [
-                '코드 리뷰 중...', '회의 준비 중...', '리서치 진행 중...',
-                '커피 한 잔 ☕', '데이터 분석 중...', '문서 작성 중...',
-                '아이디어 정리 중!', '보고서 작성 중...', '테스트 실행 중...',
-                '팀 미팅 곧 시작!', '코드 배포 준비!', '디자인 검토 중...',
+        if (!agent) return;
+        const anim = agentAnims[agent.id];
+        if (!anim) return;
+
+        let bubbles;
+        if (anim.sitting && anim.behavior === 'working') {
+            bubbles = [
+                '코드 리뷰 중...', '데이터 분석 중...', '문서 작성 중...',
+                '보고서 작성 중...', '테스트 실행 중...', '코드 배포 준비!',
+                '집중 모드! 🎧', 'API 설계 중...', '버그 수정 중...',
             ];
-            showSpeechBubble(agent.id, bubbles[Math.floor(Math.random() * bubbles.length)]);
+        } else if (anim.behavior === 'meeting') {
+            bubbles = [
+                '회의 진행 중 📋', '좋은 아이디어네요!', '다음 단계는...?',
+                '일정 조율 중...', '피드백 공유!', '전략 논의 중...',
+            ];
+        } else {
+            bubbles = [
+                '커피 한 잔 ☕', '잠깐 휴식~', '아이디어 정리 중!',
+                '팀 미팅 곧 시작!', '점심 뭐 먹지...', '오늘 날씨 좋다 ☀️',
+                '간식 타임! 🍪', '스트레칭~',
+            ];
         }
+        showSpeechBubble(agent.id, bubbles[Math.floor(Math.random() * bubbles.length)]);
     }, 8000);
 
     // Status changes — only show 'working' if agent has active tasks
