@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Office - 가상 AI 오피스</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@300;400;500;700&family=DotGothic16&display=swap');
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <canvas id="logoIcon" width="24" height="24"></canvas>
+                <span class="logo-text">AI OFFICE</span>
+            </div>
+            <span class="header-subtitle">월급 0원으로 직원 6명 운영 중</span>
+        </div>
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="office">
+                <span class="tab-icon">🏢</span> 사무실
+            </button>
+            <button class="nav-tab" data-tab="chat">
+                <span class="tab-icon">💬</span> 팀 채팅
+            </button>
+            <button class="nav-tab" data-tab="org">
+                <span class="tab-icon">📋</span> 조직도
+            </button>
+            <button class="nav-tab" data-tab="tasks">
+                <span class="tab-icon">📊</span> 업무현황
+                <span class="task-badge" id="taskBadge" style="display:none">0</span>
+            </button>
+            <button class="nav-tab" data-tab="customize">
+                <span class="tab-icon">🔧</span> 편집
+            </button>
+        </nav>
+        <div class="header-right">
+            <div class="api-status" id="apiStatus">
+                <span class="status-dot"></span>
+                <span id="apiStatusText">확인 중...</span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot online"></span>
+                <span>직원 6명 근무 중</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- ===== OFFICE VIEW ===== -->
+        <section id="tab-office" class="tab-content active">
+            <div class="office-wrapper">
+                <div class="office-scene">
+                    <canvas id="officeCanvas" width="576" height="448"></canvas>
+                    <div class="speech-bubbles" id="speechBubbles"></div>
+                </div>
+                <!-- Agent Info Panel -->
+                <div class="agent-info-panel" id="agentInfoPanel">
+                    <div class="panel-header">
+                        <h3>직원 정보</h3>
+                        <button class="close-btn" id="closePanel">&times;</button>
+                    </div>
+                    <div class="panel-body" id="panelBody">
+                        <p class="panel-hint">캐릭터를 클릭하면 정보가 표시됩니다</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Agent Status Bar -->
+            <div class="agent-status-bar" id="agentStatusBar"></div>
+        </section>
+
+        <!-- ===== CHAT VIEW ===== -->
+        <section id="tab-chat" class="tab-content">
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <h3 class="sidebar-title">참여 에이전트</h3>
+                    <div class="chat-agents" id="chatAgents"></div>
+                </div>
+                <div class="chat-main">
+                    <div class="chat-header-bar">
+                        <span class="chat-room-name"># 전체 채널</span>
+                        <span class="chat-room-desc">AI 직원들의 업무 소통 채널</span>
+                    </div>
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <input type="text" id="chatInput" placeholder="지시사항을 입력하세요..." class="chat-input">
+                            <button id="sendBtn" class="send-btn">
+                                <span>▶</span>
+                            </button>
+                        </div>
+                        <p class="chat-hint">지시만 내리면 AI 직원들이 알아서 처리합니다 (OpenAI 기반)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ORG CHART VIEW ===== -->
+        <section id="tab-org" class="tab-content">
+            <div class="org-container">
+                <h2 class="org-title">AI Organization Blueprint</h2>
+                <p class="org-subtitle">내맘대로 조직도 구성</p>
+                <div class="org-chart" id="orgChart"></div>
+            </div>
+        </section>
+
+        <!-- ===== TASK BOARD VIEW ===== -->
+        <section id="tab-tasks" class="tab-content">
+            <div class="tasks-container">
+                <div class="tasks-header">
+                    <h2 class="tasks-title">📊 업무 현황 보드</h2>
+                    <div class="tasks-filters">
+                        <button class="task-filter active" data-filter="all">전체</button>
+                        <button class="task-filter" data-filter="진행중">🔄 진행중</button>
+                        <button class="task-filter" data-filter="완료">✅ 완료</button>
+                    </div>
+                </div>
+                <div class="tasks-board" id="tasksBoard">
+                    <div class="tasks-empty">
+                        <p>아직 지시한 업무가 없습니다.</p>
+                        <p>팀 채팅에서 AI 직원에게 업무를 지시해보세요!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CUSTOMIZE VIEW ===== -->
+        <section id="tab-customize" class="tab-content">
+            <div class="customize-container">
+                <div class="customize-toolbar">
+                    <h3>도구모음</h3>
+                    <div class="furniture-categories" id="furnitureCategories"></div>
+                    <div class="furniture-items" id="furnitureItems"></div>
+                </div>
+                <div class="customize-preview">
+                    <div class="preview-header">
+                        <span class="pixel-badge">🔧 사무실 편집</span>
+                        <button class="save-btn" id="saveOffice">저장하기</button>
+                    </div>
+                    <div class="customize-grid" id="customizeGrid"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Agent Edit/Add Modal -->
+    <div class="modal-overlay" id="agentModal" style="display:none">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="modalTitle">직원 추가</h3>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalAgentId">
+                <div class="modal-field">
+                    <label>이름</label>
+                    <input type="text" id="modalName" placeholder="직원 이름">
+                </div>
+                <div class="modal-field">
+                    <label>역할</label>
+                    <input type="text" id="modalRole" placeholder="예: 백엔드 개발자">
+                </div>
+                <div class="modal-row">
+                    <div class="modal-field">
+                        <label>팀</label>
+                        <select id="modalTeam">
+                            <option value="management">경영</option>
+                            <option value="build">웹 프로덕션</option>
+                            <option value="content">콘텐츠</option>
+                            <option value="academy">교육</option>
+                        </select>
+                    </div>
+                    <div class="modal-field">
+                        <label>레벨</label>
+                        <select id="modalLevel">
+                            <option value="2">임원 (Lv.2)</option>
+                            <option value="3">팀장 (Lv.3)</option>
+                            <option value="4" selected>팀원 (Lv.4)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-field">
+                    <label>직속 상관</label>
+                    <select id="modalSupervisor">
+                        <option value="">없음 (대표 직속)</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label>업무 설명</label>
+                    <input type="text" id="modalDesc" placeholder="예: 서버 개발 / API 설계 / DB 관리">
+                </div>
+                <div class="modal-field">
+                    <label>페르소나 (AI 성격 설정)</label>
+                    <textarea id="modalPersonality" rows="3" placeholder="이 직원이 어떤 성격으로 답변할지 설명해주세요..."></textarea>
+                </div>
+                <div class="modal-field">
+                    <label>스킬 (쉼표로 구분)</label>
+                    <input type="text" id="modalSkills" placeholder="예: Python, React, DB설계">
+                </div>
+                <div class="modal-field">
+                    <label>키워드 (자동 배정용, 쉼표로 구분)</label>
+                    <input type="text" id="modalKeywords" placeholder="예: 서버, 백엔드, API, 배포">
+                </div>
+                <div class="modal-field">
+                    <label>아바타 색상</label>
+                    <div class="color-choices" id="colorChoices">
+                        <span class="color-swatch" data-color="#8B5CF6" style="background:#8B5CF6"></span>
+                        <span class="color-swatch" data-color="#3B82F6" style="background:#3B82F6"></span>
+                        <span class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></span>
+                        <span class="color-swatch" data-color="#10B981" style="background:#10B981"></span>
+                        <span class="color-swatch" data-color="#F59E0B" style="background:#F59E0B"></span>
+                        <span class="color-swatch" data-color="#EF4444" style="background:#EF4444"></span>
+                        <span class="color-swatch" data-color="#EC4899" style="background:#EC4899"></span>
+                        <span class="color-swatch" data-color="#6366F1" style="background:#6366F1"></span>
+                        <span class="color-swatch" data-color="#A78BFA" style="background:#A78BFA"></span>
+                    </div>
+                    <input type="hidden" id="modalColor" value="#3B82F6">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" id="modalCancel">취소</button>
+                <button class="modal-btn danger" id="modalDelete" style="display:none">삭제</button>
+                <button class="modal-btn primary" id="modalSave">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
