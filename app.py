@@ -35,8 +35,54 @@ def get_openai_client():
     return client
 
 
+def create_client_for_agent(agent):
+    """Create an OpenAI-compatible client based on agent's model server config."""
+    server_id = agent.get("model_server", DEFAULT_MODEL_SERVER)
+    server = MODEL_SERVERS.get(server_id, MODEL_SERVERS.get("default"))
+    if not server:
+        return None, DEFAULT_MODEL
+
+    model = agent.get("model", server.get("default_model", DEFAULT_MODEL))
+    api_key = server.get("api_key", "")
+    api_base = server.get("api_base", "")
+    server_type = server.get("type", "openai")
+
+    try:
+        if server_type == "ollama":
+            return OpenAI(api_key="ollama", base_url=api_base), model
+        elif server_type == "openai":
+            if api_key:
+                return OpenAI(api_key=api_key), model
+            return None, model
+        else:  # custom / vllm / etc
+            if api_key and api_base:
+                return OpenAI(api_key=api_key, base_url=api_base), model
+            return None, model
+    except Exception as e:
+        print(f"Failed to create client for {server_id}: {e}")
+        return None, model
+
+
 # Level definitions: 1=대표, 2=임원, 3=팀장, 4=팀원
 LEVEL_NAMES = {1: "대표", 2: "임원", 3: "팀장", 4: "팀원"}
+
+# ============================================================
+# MODEL SERVER CONFIGURATION
+# Supports OpenAI, Ollama, vLLM, or any OpenAI-compatible API
+# ============================================================
+MODEL_SERVERS = {
+    "default": {
+        "id": "default",
+        "name": "OpenAI",
+        "type": "openai",
+        "api_base": "https://api.openai.com/v1",
+        "api_key": os.getenv("OPENAI_API_KEY", ""),
+        "models": ["gpt-4o-mini", "gpt-4o"],
+        "default_model": "gpt-4o-mini",
+    }
+}
+DEFAULT_MODEL_SERVER = "default"
+DEFAULT_MODEL = "gpt-4o-mini"
 
 # AI Agent Employees
 AI_AGENTS = {
@@ -55,6 +101,8 @@ AI_AGENTS = {
         "position": {"x": 11, "y": 2},
         "personality": "당신은 AI 오피스의 CEO 직속 전략 담당입니다. 사업 전략과 시장 분석에 능하며, 빅 픽처를 보는 관점에서 답변하세요.",
         "direction": "left",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "cto_agent": {
         "id": "cto_agent",
@@ -71,6 +119,8 @@ AI_AGENTS = {
         "position": {"x": 10, "y": 1},
         "personality": "당신은 AI 오피스의 CTO입니다. 기술적인 관점에서 답변하며, 아키텍처와 코드 품질을 중시합니다. 항상 전문적이고 분석적으로 답변하세요.",
         "direction": "down",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "dev_agent": {
         "id": "dev_agent",
@@ -87,6 +137,8 @@ AI_AGENTS = {
         "position": {"x": 2, "y": 5},
         "personality": "당신은 AI 오피스의 프론트엔드 개발자입니다. UI/UX 구현과 웹 퍼블리싱에 능하며, 사용자 경험을 최우선으로 생각합니다.",
         "direction": "down",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "backend_dev": {
         "id": "backend_dev",
@@ -103,6 +155,8 @@ AI_AGENTS = {
         "position": {"x": 3, "y": 6},
         "personality": "당신은 AI 오피스의 백엔드 개발자입니다. 서버 아키텍처, API 설계, 데이터베이스 최적화에 전문가이며, 안정적이고 확장 가능한 시스템을 추구합니다.",
         "direction": "left",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "content_agent": {
         "id": "content_agent",
@@ -119,6 +173,8 @@ AI_AGENTS = {
         "position": {"x": 6, "y": 5},
         "personality": "당신은 AI 오피스의 콘텐츠 매니저입니다. 마케팅과 크리에이티브한 관점에서 답변하며, 트렌디하고 감각적인 표현을 사용하세요.",
         "direction": "right",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "edu_agent": {
         "id": "edu_agent",
@@ -135,6 +191,8 @@ AI_AGENTS = {
         "position": {"x": 10, "y": 5},
         "personality": "당신은 AI 오피스의 교육팀장입니다. 교육과 학습 설계에 전문가이며, 쉽고 친절하게 설명하는 것이 특기입니다.",
         "direction": "left",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
     "research_agent": {
         "id": "research_agent",
@@ -151,6 +209,8 @@ AI_AGENTS = {
         "position": {"x": 7, "y": 6},
         "personality": "당신은 AI 오피스의 리서처입니다. 데이터와 팩트에 기반한 정확한 답변을 제공하며, 출처와 근거를 중시합니다.",
         "direction": "up",
+        "model_server": "default",
+        "model": "gpt-4o-mini",
     },
 }
 
@@ -289,9 +349,8 @@ def process_stages_background(task_id, agent_id, user_message):
     import time
 
     agent = AI_AGENTS[agent_id]
-    # Create a fresh OpenAI client for this thread (avoid reloader issues)
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    openai_client = OpenAI(api_key=api_key) if api_key else None
+    # Create a client based on agent's model server config
+    bg_client, bg_model = create_client_for_agent(agent)
     prev_results = []
 
     for i, stage_def in enumerate(STAGE_DEFS):
@@ -320,7 +379,7 @@ def process_stages_background(task_id, agent_id, user_message):
 
         # Generate stage result via OpenAI
         result_text = generate_stage_result(
-            agent, openai_client, user_message, stage_def, i, prev_results
+            agent, bg_client, user_message, stage_def, i, prev_results, model=bg_model
         )
 
         # Update stage
@@ -353,7 +412,7 @@ def process_stages_background(task_id, agent_id, user_message):
             # Supervisor reviews the final report
             time.sleep(5)
             review_text = generate_supervisor_review(
-                supervisor, openai_client, user_message, prev_results
+                supervisor, bg_client, user_message, prev_results
             )
 
             # Add review stage to task
@@ -386,6 +445,9 @@ def process_stages_background(task_id, agent_id, user_message):
 
 def generate_supervisor_review(supervisor, openai_client, user_message, stage_results):
     """Supervisor reviews the work done by their report."""
+    sup_client, sup_model = create_client_for_agent(supervisor)
+    if sup_client:
+        openai_client = sup_client
     if openai_client:
         try:
             all_results = "\n\n".join([f"[{i+1}단계 결과]\n{r}" for i, r in enumerate(stage_results)])
@@ -401,7 +463,7 @@ def generate_supervisor_review(supervisor, openai_client, user_message, stage_re
                 f"한국어로 간결하고 건설적으로 작성하세요."
             )
             response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=sup_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"업무: {user_message}\n\n{all_results}"},
@@ -416,7 +478,7 @@ def generate_supervisor_review(supervisor, openai_client, user_message, stage_re
     return f"✅ 검토 완료. 보고서 품질 양호합니다. 승인합니다."
 
 
-def generate_stage_result(agent, openai_client, user_message, stage_def, stage_idx, prev_results):
+def generate_stage_result(agent, openai_client, user_message, stage_def, stage_idx, prev_results, model="gpt-4o-mini"):
     """Generate a single stage's result."""
     if openai_client:
         try:
@@ -435,7 +497,7 @@ def generate_stage_result(agent, openai_client, user_message, stage_def, stage_i
             user_content = f"업무 지시: {user_message}{context}"
 
             response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
@@ -541,6 +603,8 @@ def create_agent():
         "position": pos,
         "personality": data.get("personality", f"당신은 AI 오피스의 {data.get('role', '팀원')}입니다. 맡은 역할에 맞게 전문적으로 답변하세요."),
         "direction": "down",
+        "model_server": data.get("model_server", DEFAULT_MODEL_SERVER),
+        "model": data.get("model", DEFAULT_MODEL),
     }
     AI_AGENTS[agent_id] = agent
     return jsonify(agent), 201
@@ -559,6 +623,11 @@ def update_agent(agent_id):
     for key in updatable:
         if key in data:
             agent[key] = data[key]
+
+    if "model_server" in data:
+        agent["model_server"] = data["model_server"]
+    if "model" in data:
+        agent["model"] = data["model"]
 
     return jsonify(agent)
 
@@ -717,9 +786,10 @@ def pick_best_agent(message):
 
 def generate_ack_response(agent, user_message):
     """Quick acknowledgement (not the full report)."""
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    openai_client = OpenAI(api_key=api_key) if api_key else None
-    if openai_client:
+    ack_client, ack_model = create_client_for_agent(agent)
+    if not ack_client:
+        return f"네, '{user_message[:30]}' 건 확인했습니다. 바로 처리하겠습니다."
+    if ack_client:
         try:
             system_prompt = (
                 f"당신의 이름은 '{agent['name']}'이고, 역할은 '{agent['role']}'입니다. "
@@ -728,8 +798,8 @@ def generate_ack_response(agent, user_message):
                 f"1문장으로, '확인했습니다. ~하겠습니다' 형식으로 답변하세요. "
                 f"구체적으로 어떤 작업을 할 것인지 간략히 언급하세요."
             )
-            response = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = ack_client.chat.completions.create(
+                model=ack_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
@@ -805,6 +875,104 @@ def save_layout():
         if isinstance(data["placed"], dict):
             PLACED_FURNITURE = data["placed"]
     return jsonify({"success": True})
+
+
+# ============================================================
+# MODEL SERVER API
+# ============================================================
+@app.route("/api/model-servers", methods=["GET"])
+def get_model_servers():
+    # Return servers with api_key masked
+    result = {}
+    for sid, srv in MODEL_SERVERS.items():
+        s = dict(srv)
+        if s.get("api_key"):
+            key = s["api_key"]
+            s["api_key_masked"] = key[:8] + "..." + key[-4:] if len(key) > 12 else "****"
+        else:
+            s["api_key_masked"] = ""
+        s["api_key"] = ""  # never send raw key to frontend
+        result[sid] = s
+    return jsonify(result)
+
+
+@app.route("/api/model-servers", methods=["POST"])
+def add_model_server():
+    data = request.get_json(force=True)
+    server_id = data.get("id", f"server_{uuid.uuid4().hex[:6]}")
+    models_str = data.get("models", "")
+    models_list = [m.strip() for m in models_str.split(",") if m.strip()] if isinstance(models_str, str) else models_str
+
+    MODEL_SERVERS[server_id] = {
+        "id": server_id,
+        "name": data.get("name", "Unnamed"),
+        "type": data.get("type", "custom"),
+        "api_base": data.get("api_base", ""),
+        "api_key": data.get("api_key", ""),
+        "models": models_list,
+        "default_model": models_list[0] if models_list else "",
+    }
+    return jsonify({"success": True, "id": server_id})
+
+
+@app.route("/api/model-servers/<server_id>", methods=["PUT"])
+def update_model_server(server_id):
+    if server_id not in MODEL_SERVERS:
+        return jsonify({"error": "Not found"}), 404
+    data = request.get_json(force=True)
+    srv = MODEL_SERVERS[server_id]
+    if "name" in data:
+        srv["name"] = data["name"]
+    if "type" in data:
+        srv["type"] = data["type"]
+    if "api_base" in data:
+        srv["api_base"] = data["api_base"]
+    if "api_key" in data and data["api_key"]:  # only update if provided
+        srv["api_key"] = data["api_key"]
+    if "models" in data:
+        models = data["models"]
+        srv["models"] = [m.strip() for m in models.split(",") if m.strip()] if isinstance(models, str) else models
+    if "default_model" in data:
+        srv["default_model"] = data["default_model"]
+    return jsonify({"success": True})
+
+
+@app.route("/api/model-servers/<server_id>", methods=["DELETE"])
+def delete_model_server(server_id):
+    if server_id == "default":
+        return jsonify({"error": "Cannot delete default server"}), 400
+    if server_id in MODEL_SERVERS:
+        del MODEL_SERVERS[server_id]
+        # Reset agents using this server to default
+        for a in AI_AGENTS.values():
+            if a.get("model_server") == server_id:
+                a["model_server"] = "default"
+                a["model"] = DEFAULT_MODEL
+    return jsonify({"success": True})
+
+
+@app.route("/api/model-servers/<server_id>/test", methods=["POST"])
+def test_model_server(server_id):
+    if server_id not in MODEL_SERVERS:
+        return jsonify({"success": False, "error": "Server not found"}), 404
+    srv = MODEL_SERVERS[server_id]
+    try:
+        if srv["type"] == "ollama":
+            test_client = OpenAI(api_key="ollama", base_url=srv["api_base"])
+        elif srv["type"] == "openai":
+            test_client = OpenAI(api_key=srv["api_key"])
+        else:
+            test_client = OpenAI(api_key=srv["api_key"], base_url=srv["api_base"])
+
+        model = srv.get("default_model") or (srv["models"][0] if srv["models"] else "gpt-4o-mini")
+        response = test_client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Hi, respond with just 'OK'"}],
+            max_tokens=5,
+        )
+        return jsonify({"success": True, "response": response.choices[0].message.content})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/org")

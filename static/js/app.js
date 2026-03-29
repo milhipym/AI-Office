@@ -598,40 +598,31 @@ function drawOffice() {
             ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
             if (type === 'wall') {
-                // === Wall with panel grid ===
-                // Main wall surface
-                ctx.fillStyle = '#8a8a98';
+                // === Wall — clean panel grid like reference ===
+                ctx.fillStyle = '#909098';
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                // Upper part (lighter - top face)
-                ctx.fillStyle = '#9696a4';
-                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE * 0.3);
-                // Panel grid lines
+                // Subtle panel grid (3×3)
                 const p = TILE_SIZE / 3;
-                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-                ctx.lineWidth = 0.5;
-                for (let gx = 0; gx <= 3; gx++) {
+                ctx.strokeStyle = 'rgba(200,200,210,0.25)';
+                ctx.lineWidth = 1;
+                for (let gx = 1; gx < 3; gx++) {
                     ctx.beginPath();
                     ctx.moveTo(x + gx * p, y);
                     ctx.lineTo(x + gx * p, y + TILE_SIZE);
                     ctx.stroke();
                 }
-                for (let gy = 0; gy <= 3; gy++) {
+                for (let gy = 1; gy < 3; gy++) {
                     ctx.beginPath();
                     ctx.moveTo(x, y + gy * p);
                     ctx.lineTo(x + TILE_SIZE, y + gy * p);
                     ctx.stroke();
                 }
-                // Dark grid lines (shadow)
-                ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-                for (let gx = 0; gx <= 3; gx++) {
-                    ctx.beginPath();
-                    ctx.moveTo(x + gx * p + 1, y);
-                    ctx.lineTo(x + gx * p + 1, y + TILE_SIZE);
-                    ctx.stroke();
-                }
-                // Bottom shadow edge
-                ctx.fillStyle = '#6a6a78';
+                // Bottom dark edge (wall base shadow)
+                ctx.fillStyle = '#6A6A78';
                 ctx.fillRect(x, y + TILE_SIZE - 2, TILE_SIZE, 2);
+                // Top bright edge
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                ctx.fillRect(x, y, TILE_SIZE, 1);
             } else {
                 // === Floor with subtle tile pattern ===
                 const half = TILE_SIZE / 2;
@@ -776,313 +767,341 @@ function drawFurniturePixel(ctx, type, x, y) {
     const S = TILE_SIZE;
     const cx = x + S / 2;
     const cy = y + S / 2;
+    // Scale factor: furniture overflows tile for realistic proportions
+    const F = S / 48; // normalize to design at 48px base
 
     switch (type) {
-        /* ====== DESK ====== */
+        /* ====== DESK — large isometric wooden desk ====== */
         case 'desk': {
+            const dw = 42*F, dh = 14*F; // desk top dimensions
+            const dx = cx - dw/2, dy = cy - 4*F;
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.08)';
-            ctx.fillRect(cx - 18, cy + 16, 36, 3);
-            // Legs
-            ctx.fillStyle = '#5C3D0E';
-            ctx.fillRect(cx - 18, cy + 10, 3, 8);
-            ctx.fillRect(cx + 15, cy + 10, 3, 8);
-            // Front panel
-            ctx.fillStyle = '#7A5920';
-            ctx.fillRect(cx - 18, cy + 2, 36, 10);
-            // Drawer line
-            ctx.fillStyle = '#694D18';
-            ctx.fillRect(cx - 16, cy + 3, 14, 8);
-            ctx.fillRect(cx + 2, cy + 3, 14, 8);
-            // Drawer inner
-            ctx.fillStyle = '#8A6930';
-            ctx.fillRect(cx - 15, cy + 4, 12, 6);
-            ctx.fillRect(cx + 3, cy + 4, 12, 6);
-            // Handles
-            ctx.fillStyle = '#C0A050';
-            ctx.fillRect(cx - 11, cy + 6, 4, 2);
-            ctx.fillRect(cx + 7, cy + 6, 4, 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.10)';
+            ctx.fillRect(dx - 2*F, dy + dh + 10*F, dw + 4*F, 4*F);
+            // Back legs
+            ctx.fillStyle = '#5A3A10';
+            ctx.fillRect(dx + 2*F, dy + dh + 6*F, 3*F, 8*F);
+            ctx.fillRect(dx + dw - 5*F, dy + dh + 6*F, 3*F, 8*F);
+            // Front panel (face)
+            ctx.fillStyle = '#7A5A25';
+            ctx.fillRect(dx, dy + dh, dw, 12*F);
+            // Panel detail — two drawers
+            ctx.fillStyle = '#6A4A18';
+            ctx.fillRect(dx + 2*F, dy + dh + 1*F, dw/2 - 3*F, 10*F);
+            ctx.fillRect(dx + dw/2 + 1*F, dy + dh + 1*F, dw/2 - 3*F, 10*F);
+            // Drawer inset
+            ctx.fillStyle = '#8A6A35';
+            ctx.fillRect(dx + 3*F, dy + dh + 2*F, dw/2 - 5*F, 8*F);
+            ctx.fillRect(dx + dw/2 + 2*F, dy + dh + 2*F, dw/2 - 5*F, 8*F);
+            // Drawer handles (brass)
+            ctx.fillStyle = '#D4B060';
+            ctx.fillRect(dx + 8*F, dy + dh + 5*F, 5*F, 2*F);
+            ctx.fillRect(dx + dw/2 + 6*F, dy + dh + 5*F, 5*F, 2*F);
             // Table top surface
-            ctx.fillStyle = '#A08040';
-            ctx.fillRect(cx - 20, cy - 6, 40, 10);
-            // Surface highlight (grain)
-            ctx.fillStyle = '#B89850';
-            ctx.fillRect(cx - 18, cy - 5, 36, 2);
-            ctx.fillStyle = '#C0A860';
-            ctx.fillRect(cx - 18, cy - 2, 36, 1);
-            ctx.fillStyle = '#B89850';
-            ctx.fillRect(cx - 18, cy + 1, 36, 1);
-            // Top edge bevel
-            ctx.fillStyle = '#C8B070';
-            ctx.fillRect(cx - 20, cy - 6, 40, 2);
-            // Side edge (left)
+            ctx.fillStyle = '#A88545';
+            ctx.fillRect(dx - 2*F, dy, dw + 4*F, dh);
+            // Wood grain highlight lines
+            ctx.fillStyle = '#BEA060';
+            ctx.fillRect(dx, dy + 1*F, dw, 2*F);
+            ctx.fillStyle = '#C8AA68';
+            ctx.fillRect(dx, dy + 5*F, dw, 1*F);
+            ctx.fillStyle = '#BEA060';
+            ctx.fillRect(dx, dy + 9*F, dw, 1*F);
+            // Top bevel (light edge)
+            ctx.fillStyle = '#D0B878';
+            ctx.fillRect(dx - 2*F, dy, dw + 4*F, 2*F);
+            // Left/right side bevel
             ctx.fillStyle = '#907030';
-            ctx.fillRect(cx - 20, cy - 4, 2, 8);
-            // Side edge (right)
-            ctx.fillRect(cx + 18, cy - 4, 2, 8);
-            // Items on desk: paper
-            ctx.fillStyle = '#f0ece0';
-            ctx.fillRect(cx - 10, cy - 4, 7, 5);
-            ctx.fillStyle = '#bbb';
-            ctx.fillRect(cx - 9, cy - 3, 4, 1);
-            ctx.fillRect(cx - 9, cy - 1, 5, 1);
-            // Pencil
-            ctx.fillStyle = '#e8c040';
-            ctx.fillRect(cx + 6, cy - 3, 8, 2);
-            ctx.fillStyle = '#333';
-            ctx.fillRect(cx + 13, cy - 3, 2, 2);
+            ctx.fillRect(dx - 2*F, dy + 2*F, 2*F, dh - 2*F);
+            ctx.fillRect(dx + dw + 2*F - 2*F, dy + 2*F, 2*F, dh - 2*F);
+            // Desktop items — papers
+            ctx.fillStyle = '#F0ECE0';
+            ctx.fillRect(cx - 12*F, dy + 3*F, 8*F, 6*F);
+            ctx.fillStyle = '#C0B8A0';
+            ctx.fillRect(cx - 11*F, dy + 4*F, 5*F, 1*F);
+            ctx.fillRect(cx - 11*F, dy + 6*F, 6*F, 1*F);
+            // Desktop item — mug
+            ctx.fillStyle = '#E0E0D8';
+            ctx.fillRect(cx + 8*F, dy + 3*F, 5*F, 5*F);
+            ctx.fillStyle = '#D0D0C0';
+            ctx.fillRect(cx + 9*F, dy + 4*F, 3*F, 3*F);
+            // Coffee in mug
+            ctx.fillStyle = '#6A4020';
+            ctx.fillRect(cx + 9*F, dy + 4*F, 3*F, 2*F);
             break;
         }
 
-        /* ====== MONITOR ====== */
+        /* ====== MONITOR — large screen with code content + keyboard ====== */
         case 'monitor': {
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.06)';
-            ctx.fillRect(cx - 6, cy + 12, 12, 2);
-            // Base
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.fillRect(cx - 8*F, cy + 14*F, 16*F, 3*F);
+            // Base plate
             ctx.fillStyle = '#555';
-            ctx.fillRect(cx - 7, cy + 9, 14, 3);
+            ctx.fillRect(cx - 8*F, cy + 10*F, 16*F, 4*F);
             ctx.fillStyle = '#666';
-            ctx.fillRect(cx - 5, cy + 8, 10, 2);
+            ctx.fillRect(cx - 6*F, cy + 9*F, 12*F, 2*F);
             // Stand neck
             ctx.fillStyle = '#777';
-            ctx.fillRect(cx - 2, cy + 3, 4, 6);
-            // Monitor body
-            ctx.fillStyle = '#2a2a2a';
-            ctx.fillRect(cx - 13, cy - 13, 26, 18);
+            ctx.fillRect(cx - 2*F, cy + 3*F, 4*F, 7*F);
+            // Monitor housing
+            ctx.fillStyle = '#222';
+            ctx.fillRect(cx - 16*F, cy - 16*F, 32*F, 22*F);
             // Inner bezel
             ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(cx - 12, cy - 12, 24, 16);
+            ctx.fillRect(cx - 15*F, cy - 15*F, 30*F, 20*F);
             // Screen
             const t = Date.now() * 0.001;
             const gb = 0.7 + Math.sin(t * 1.5) * 0.3;
-            ctx.fillStyle = `rgba(15, 30, 20, 1)`;
-            ctx.fillRect(cx - 11, cy - 11, 22, 14);
-            // Screen content: code lines
-            ctx.fillStyle = `rgba(60, 200, 100, ${gb * 0.9})`;
-            ctx.fillRect(cx - 9, cy - 9, 10, 1);
-            ctx.fillStyle = `rgba(80, 220, 140, ${gb * 0.7})`;
-            ctx.fillRect(cx - 9, cy - 7, 16, 1);
-            ctx.fillStyle = `rgba(60, 180, 120, ${gb * 0.8})`;
-            ctx.fillRect(cx - 5, cy - 5, 12, 1);
-            ctx.fillStyle = `rgba(100, 230, 150, ${gb * 0.6})`;
-            ctx.fillRect(cx - 9, cy - 3, 8, 1);
-            ctx.fillStyle = `rgba(70, 200, 130, ${gb * 0.7})`;
-            ctx.fillRect(cx - 9, cy - 1, 14, 1);
-            ctx.fillStyle = `rgba(90, 210, 140, ${gb * 0.5})`;
-            ctx.fillRect(cx - 5, cy + 1, 10, 1);
+            ctx.fillStyle = '#0D1A14';
+            ctx.fillRect(cx - 14*F, cy - 14*F, 28*F, 18*F);
+            // Screen content — code lines
+            const codeColors = [
+                [`rgba(60,200,100,${gb*0.9})`, 12*F],
+                [`rgba(100,180,220,${gb*0.7})`, 20*F],
+                [`rgba(60,180,120,${gb*0.8})`, 14*F],
+                [`rgba(220,180,80,${gb*0.6})`, 10*F],
+                [`rgba(70,200,130,${gb*0.7})`, 18*F],
+                [`rgba(180,120,200,${gb*0.5})`, 12*F],
+                [`rgba(100,220,150,${gb*0.6})`, 16*F],
+                [`rgba(80,180,220,${gb*0.8})`, 8*F],
+            ];
+            for (let li = 0; li < codeColors.length; li++) {
+                ctx.fillStyle = codeColors[li][0];
+                const indent = (li % 3) * 3*F;
+                ctx.fillRect(cx - 12*F + indent, cy - 12*F + li * 2*F, codeColors[li][1], 1*F);
+            }
             // Screen reflection
-            ctx.fillStyle = 'rgba(255,255,255,0.04)';
-            ctx.fillRect(cx - 11, cy - 11, 22, 7);
-            // Bezel highlight
-            ctx.fillStyle = '#3a3a3a';
-            ctx.fillRect(cx - 13, cy - 13, 26, 1);
+            ctx.fillStyle = 'rgba(255,255,255,0.03)';
+            ctx.fillRect(cx - 14*F, cy - 14*F, 28*F, 9*F);
+            // Top bezel highlight
+            ctx.fillStyle = '#333';
+            ctx.fillRect(cx - 16*F, cy - 16*F, 32*F, 1*F);
             // Power LED
             ctx.fillStyle = '#0f0';
-            ctx.fillRect(cx + 9, cy + 4, 2, 1);
+            ctx.fillRect(cx + 12*F, cy + 5*F, 2*F, 1*F);
             // Keyboard
-            ctx.fillStyle = '#444';
-            ctx.fillRect(cx - 10, cy + 13, 20, 5);
-            ctx.fillStyle = '#555';
-            for (let ki = 0; ki < 5; ki++) {
-                ctx.fillRect(cx - 8 + ki * 4, cy + 14, 3, 1);
-                ctx.fillRect(cx - 8 + ki * 4, cy + 16, 3, 1);
+            ctx.fillStyle = '#3A3A3A';
+            ctx.fillRect(cx - 14*F, cy + 15*F, 28*F, 7*F);
+            ctx.fillStyle = '#4A4A4A';
+            for (let kr = 0; kr < 3; kr++) {
+                for (let kc = 0; kc < 8; kc++) {
+                    ctx.fillRect(cx - 12*F + kc * 3.2*F, cy + 16*F + kr * 2*F, 2.5*F, 1.3*F);
+                }
             }
+            // Spacebar
+            ctx.fillRect(cx - 6*F, cy + 21*F, 12*F, 1.5*F);
             break;
         }
 
-        /* ====== CHAIR ====== */
+        /* ====== CHAIR — wooden chair with backrest ====== */
         case 'chair': {
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.06)';
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
             ctx.beginPath();
-            ctx.ellipse(cx, cy + 14, 8, 3, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy + 16*F, 9*F, 3*F, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Legs/wheels
-            ctx.fillStyle = '#555';
-            ctx.fillRect(cx - 8, cy + 10, 2, 4);
-            ctx.fillRect(cx + 6, cy + 10, 2, 4);
-            ctx.fillRect(cx - 1, cy + 12, 2, 3);
-            // Wheels
-            ctx.fillStyle = '#333';
-            ctx.fillRect(cx - 9, cy + 13, 3, 2);
-            ctx.fillRect(cx + 6, cy + 13, 3, 2);
-            // Seat cylinder
-            ctx.fillStyle = '#666';
-            ctx.fillRect(cx - 1, cy + 4, 3, 7);
-            // Seat cushion
-            ctx.fillStyle = '#8B3030';
-            ctx.fillRect(cx - 9, cy - 2, 18, 8);
-            ctx.fillStyle = '#A04040';
-            ctx.fillRect(cx - 8, cy - 1, 16, 6);
-            // Seat highlight
-            ctx.fillStyle = '#B85050';
-            ctx.fillRect(cx - 6, cy, 12, 2);
-            // Back rest
-            ctx.fillStyle = '#782828';
-            ctx.fillRect(cx - 10, cy - 12, 20, 12);
-            // Back cushion
-            ctx.fillStyle = '#903838';
-            ctx.fillRect(cx - 8, cy - 10, 16, 8);
-            // Back highlight
-            ctx.fillStyle = '#A84848';
-            ctx.fillRect(cx - 6, cy - 9, 12, 2);
-            // Armrests
-            ctx.fillStyle = '#555';
-            ctx.fillRect(cx - 11, cy - 3, 3, 6);
-            ctx.fillRect(cx + 8, cy - 3, 3, 6);
+            // Back legs
+            ctx.fillStyle = '#5A3A10';
+            ctx.fillRect(cx - 9*F, cy + 8*F, 3*F, 10*F);
+            ctx.fillRect(cx + 6*F, cy + 8*F, 3*F, 10*F);
+            // Front legs
+            ctx.fillStyle = '#6A4A1A';
+            ctx.fillRect(cx - 8*F, cy + 12*F, 2*F, 6*F);
+            ctx.fillRect(cx + 6*F, cy + 12*F, 2*F, 6*F);
+            // Seat (top-down view — wooden plank)
+            ctx.fillStyle = '#8B6A30';
+            ctx.fillRect(cx - 10*F, cy + 2*F, 20*F, 10*F);
+            ctx.fillStyle = '#A07A3A';
+            ctx.fillRect(cx - 9*F, cy + 3*F, 18*F, 8*F);
+            // Seat wood grain
+            ctx.fillStyle = '#B08A48';
+            ctx.fillRect(cx - 7*F, cy + 4*F, 14*F, 1*F);
+            ctx.fillRect(cx - 7*F, cy + 7*F, 14*F, 1*F);
+            // Backrest (vertical slats)
+            ctx.fillStyle = '#6A4A1A';
+            ctx.fillRect(cx - 10*F, cy - 14*F, 20*F, 17*F);
+            // Slats
+            ctx.fillStyle = '#7A5A28';
+            ctx.fillRect(cx - 8*F, cy - 12*F, 5*F, 13*F);
+            ctx.fillRect(cx - 1*F, cy - 12*F, 5*F, 13*F);
+            ctx.fillRect(cx + 5*F, cy - 12*F, 4*F, 13*F);
+            // Top rail
+            ctx.fillStyle = '#8A6A38';
+            ctx.fillRect(cx - 10*F, cy - 14*F, 20*F, 3*F);
+            // Top rail highlight
+            ctx.fillStyle = '#A0804A';
+            ctx.fillRect(cx - 9*F, cy - 14*F, 18*F, 1*F);
             break;
         }
 
-        /* ====== PLANT ====== */
+        /* ====== PLANT — large lush potted plant ====== */
         case 'plant': {
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.06)';
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
             ctx.beginPath();
-            ctx.ellipse(cx, cy + 18, 10, 3, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy + 20*F, 12*F, 4*F, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Pot body
+            // Pot body (terracotta)
             ctx.fillStyle = '#A0522D';
-            ctx.fillRect(cx - 8, cy + 6, 16, 12);
-            // Pot side shade
+            ctx.fillRect(cx - 10*F, cy + 6*F, 20*F, 14*F);
             ctx.fillStyle = '#8B4220';
-            ctx.fillRect(cx + 4, cy + 6, 4, 12);
-            // Pot highlight
+            ctx.fillRect(cx + 4*F, cy + 6*F, 6*F, 14*F);
             ctx.fillStyle = '#B86840';
-            ctx.fillRect(cx - 6, cy + 7, 4, 10);
+            ctx.fillRect(cx - 8*F, cy + 7*F, 4*F, 12*F);
             // Pot rim
             ctx.fillStyle = '#C07848';
-            ctx.fillRect(cx - 10, cy + 4, 20, 4);
-            ctx.fillStyle = '#D08858';
-            ctx.fillRect(cx - 9, cy + 4, 18, 2);
+            ctx.fillRect(cx - 12*F, cy + 3*F, 24*F, 5*F);
+            ctx.fillStyle = '#D89060';
+            ctx.fillRect(cx - 11*F, cy + 3*F, 22*F, 2*F);
             // Soil
             ctx.fillStyle = '#3A2510';
-            ctx.fillRect(cx - 7, cy + 3, 14, 3);
-            ctx.fillStyle = '#4A3520';
-            ctx.fillRect(cx - 5, cy + 3, 10, 2);
-            // Stem
+            ctx.fillRect(cx - 9*F, cy + 2*F, 18*F, 3*F);
+            // Stems
             ctx.fillStyle = '#2B6B1A';
-            ctx.fillRect(cx - 1, cy - 4, 3, 10);
-            // Leaves - layered for depth
-            ctx.fillStyle = '#1B7030';
-            _leaf(ctx, cx - 8, cy - 6, 8, 6);
+            ctx.fillRect(cx - 1*F, cy - 8*F, 3*F, 12*F);
+            ctx.fillRect(cx - 5*F, cy - 4*F, 2*F, 8*F);
+            ctx.fillRect(cx + 4*F, cy - 6*F, 2*F, 10*F);
+            // Leaves — large and lush, overflowing tile
+            ctx.fillStyle = '#1A7030';
+            _leaf(ctx, cx - 12*F, cy - 6*F, 10*F, 7*F);
             ctx.fillStyle = '#209040';
-            _leaf(ctx, cx + 6, cy - 8, 7, 5);
+            _leaf(ctx, cx + 10*F, cy - 10*F, 9*F, 6*F);
             ctx.fillStyle = '#188038';
-            _leaf(ctx, cx - 4, cy - 14, 7, 6);
+            _leaf(ctx, cx - 6*F, cy - 18*F, 9*F, 7*F);
             ctx.fillStyle = '#22A048';
-            _leaf(ctx, cx + 2, cy - 12, 8, 5);
+            _leaf(ctx, cx + 4*F, cy - 16*F, 10*F, 6*F);
             ctx.fillStyle = '#28B050';
-            _leaf(ctx, cx - 6, cy - 10, 6, 5);
+            _leaf(ctx, cx - 10*F, cy - 12*F, 8*F, 6*F);
             ctx.fillStyle = '#30C060';
-            _leaf(ctx, cx + 8, cy - 4, 5, 4);
+            _leaf(ctx, cx + 12*F, cy - 4*F, 7*F, 5*F);
             ctx.fillStyle = '#18A040';
-            _leaf(ctx, cx, cy - 16, 6, 5);
-            // Leaf veins (highlights)
-            ctx.fillStyle = 'rgba(255,255,255,0.12)';
-            ctx.fillRect(cx - 7, cy - 7, 6, 1);
-            ctx.fillRect(cx + 3, cy - 9, 5, 1);
-            ctx.fillRect(cx - 3, cy - 15, 4, 1);
-            ctx.fillRect(cx + 1, cy - 13, 5, 1);
+            _leaf(ctx, cx, cy - 22*F, 8*F, 6*F);
+            ctx.fillStyle = '#25B848';
+            _leaf(ctx, cx - 14*F, cy - 2*F, 6*F, 5*F);
+            ctx.fillStyle = '#20A845';
+            _leaf(ctx, cx + 8*F, cy - 20*F, 7*F, 5*F);
+            // Leaf highlights
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(cx - 10*F, cy - 7*F, 7*F, 1*F);
+            ctx.fillRect(cx + 6*F, cy - 11*F, 6*F, 1*F);
+            ctx.fillRect(cx - 4*F, cy - 19*F, 5*F, 1*F);
+            ctx.fillRect(cx + 2*F, cy - 17*F, 6*F, 1*F);
+            ctx.fillRect(cx - 1*F, cy - 23*F, 5*F, 1*F);
             break;
         }
 
-        /* ====== BOOKSHELF ====== */
+        /* ====== BOOKSHELF — tall with 3 shelves of colored books ====== */
         case 'bookshelf': {
+            const bw = 38*F, bh = 48*F; // taller than tile
+            const bx = cx - bw/2, by = cy - bh/2 - 4*F;
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.08)';
-            ctx.fillRect(cx - 16, cy + 17, 34, 3);
-            // Shelf body
-            ctx.fillStyle = '#5A3A0A';
-            ctx.fillRect(cx - 18, cy - 20, 36, 40);
-            // Inner back
-            ctx.fillStyle = '#4A2A00';
-            ctx.fillRect(cx - 16, cy - 18, 32, 36);
-            // Shelf boards
-            ctx.fillStyle = '#6A4A1A';
-            ctx.fillRect(cx - 18, cy - 20, 36, 3);  // top
-            ctx.fillRect(cx - 18, cy - 6, 36, 2);    // middle
-            ctx.fillRect(cx - 18, cy + 8, 36, 2);     // lower
-            ctx.fillRect(cx - 18, cy + 18, 36, 3);    // bottom
+            ctx.fillStyle = 'rgba(0,0,0,0.10)';
+            ctx.fillRect(bx - 1*F, by + bh, bw + 3*F, 4*F);
+            // Main body
+            ctx.fillStyle = '#5A3A0C';
+            ctx.fillRect(bx, by, bw, bh);
+            // Inner back wall
+            ctx.fillStyle = '#42280A';
+            ctx.fillRect(bx + 3*F, by + 3*F, bw - 6*F, bh - 4*F);
             // Side panels
             ctx.fillStyle = '#7A5A2A';
-            ctx.fillRect(cx - 18, cy - 20, 3, 40);
-            ctx.fillStyle = '#5A3A0A';
-            ctx.fillRect(cx + 15, cy - 20, 3, 40);
-            // Top shelf books
-            const c1 = ['#C83030','#2878C0','#D8A020','#28A048','#8838A8','#D06830'];
+            ctx.fillRect(bx, by, 3*F, bh);
+            ctx.fillStyle = '#5A3A0C';
+            ctx.fillRect(bx + bw - 3*F, by, 3*F, bh);
+            // Top crown
+            ctx.fillStyle = '#8A6A38';
+            ctx.fillRect(bx - 1*F, by, bw + 2*F, 4*F);
+            ctx.fillStyle = '#A0804A';
+            ctx.fillRect(bx, by, bw, 2*F);
+            // Shelf boards
+            const shelfY = [by + 4*F, by + 17*F, by + 30*F, by + bh - 2*F];
+            for (const sy of shelfY) {
+                ctx.fillStyle = '#6A4A1A';
+                ctx.fillRect(bx + 2*F, sy, bw - 4*F, 2*F);
+                ctx.fillStyle = '#8A6A38';
+                ctx.fillRect(bx + 3*F, sy, bw - 6*F, 1*F);
+            }
+            // Books — top shelf
+            const colors1 = ['#C83030','#2878C0','#D8A020','#28A048','#8838A8','#D06830','#2060A0'];
+            for (let i = 0; i < 7; i++) {
+                const h = 9*F + (i % 3) * 2*F;
+                ctx.fillStyle = colors1[i];
+                ctx.fillRect(bx + 4*F + i * 4*F, shelfY[1] - h, 3*F, h);
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx.fillRect(bx + 4*F + i * 4*F, shelfY[1] - h, 3*F, 1*F);
+            }
+            // Books — middle shelf
+            const colors2 = ['#E07030','#1AAA5A','#7030A0','#2050A0','#C8B030','#A02060'];
             for (let i = 0; i < 6; i++) {
-                const bh = 9 + (i % 3) * 2;
-                ctx.fillStyle = c1[i];
-                ctx.fillRect(cx - 14 + i * 5, cy - 4 - bh, 4, bh);
+                const h = 8*F + (i % 2) * 3*F;
+                ctx.fillStyle = colors2[i];
+                ctx.fillRect(bx + 4*F + i * 5*F, shelfY[2] - h, 4*F, h);
                 ctx.fillStyle = 'rgba(255,255,255,0.12)';
-                ctx.fillRect(cx - 14 + i * 5, cy - 4 - bh, 4, 1);
+                ctx.fillRect(bx + 4*F + i * 5*F, shelfY[2] - h, 4*F, 1*F);
             }
-            // Middle shelf books
-            const c2 = ['#E07030','#1AAA5A','#7030A0','#2050A0','#C8B030'];
-            for (let i = 0; i < 5; i++) {
-                const bh = 8 + (i % 2) * 3;
-                ctx.fillStyle = c2[i];
-                ctx.fillRect(cx - 14 + i * 6, cy + 10 - bh, 5, bh);
-                ctx.fillStyle = 'rgba(255,255,255,0.1)';
-                ctx.fillRect(cx - 14 + i * 6, cy + 10 - bh, 5, 1);
-            }
-            // Bottom shelf: horizontal books
+            // Books — bottom shelf (some horizontal)
             ctx.fillStyle = '#B84040';
-            ctx.fillRect(cx - 14, cy + 11, 12, 3);
+            ctx.fillRect(bx + 4*F, shelfY[3] - 5*F, 14*F, 4*F);
             ctx.fillStyle = '#3070B0';
-            ctx.fillRect(cx - 14, cy + 14, 14, 2);
+            ctx.fillRect(bx + 4*F, shelfY[3] - 9*F, 12*F, 3*F);
             ctx.fillStyle = '#C0A030';
-            ctx.fillRect(cx + 2, cy + 11, 10, 4);
-            // Front edge highlight
-            ctx.fillStyle = '#8A6A3A';
-            ctx.fillRect(cx - 18, cy - 20, 36, 1);
+            ctx.fillRect(bx + 18*F, shelfY[3] - 8*F, 4*F, 7*F);
+            ctx.fillStyle = '#408040';
+            ctx.fillRect(bx + 23*F, shelfY[3] - 10*F, 3*F, 9*F);
+            ctx.fillStyle = '#8030A0';
+            ctx.fillRect(bx + 27*F, shelfY[3] - 7*F, 4*F, 6*F);
             break;
         }
 
-        /* ====== SOFA ====== */
+        /* ====== SOFA — large pink/salmon sofa ====== */
         case 'sofa': {
+            const sw = 44*F, sh = 28*F;
+            const sx = cx - sw/2, sy = cy - sh/2 + 2*F;
             // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.08)';
-            ctx.fillRect(cx - 20, cy + 12, 40, 4);
-            // Base/legs
+            ctx.fillStyle = 'rgba(0,0,0,0.10)';
+            ctx.fillRect(sx - 2*F, sy + sh, sw + 4*F, 4*F);
+            // Legs
             ctx.fillStyle = '#5A2A18';
-            ctx.fillRect(cx - 18, cy + 10, 4, 4);
-            ctx.fillRect(cx + 14, cy + 10, 4, 4);
-            // Sofa body
-            ctx.fillStyle = '#C06070';
-            ctx.fillRect(cx - 20, cy - 4, 40, 16);
+            ctx.fillRect(sx + 2*F, sy + sh - 2*F, 4*F, 5*F);
+            ctx.fillRect(sx + sw - 6*F, sy + sh - 2*F, 4*F, 5*F);
+            // Armrests (sides)
+            ctx.fillStyle = '#B85868';
+            ctx.fillRect(sx - 4*F, sy + 2*F, 6*F, sh - 4*F);
+            ctx.fillRect(sx + sw - 2*F, sy + 2*F, 6*F, sh - 4*F);
+            // Armrest tops
+            ctx.fillStyle = '#D07080';
+            ctx.fillRect(sx - 4*F, sy + 2*F, 6*F, 4*F);
+            ctx.fillRect(sx + sw - 2*F, sy + 2*F, 6*F, 4*F);
             // Back rest
             ctx.fillStyle = '#A85060';
-            ctx.fillRect(cx - 20, cy - 12, 40, 10);
-            // Back rest highlight
-            ctx.fillStyle = '#B86070';
-            ctx.fillRect(cx - 18, cy - 11, 36, 3);
-            // Seat cushion left
-            ctx.fillStyle = '#D87888';
-            ctx.fillRect(cx - 18, cy - 2, 16, 12);
-            // Seat cushion right
-            ctx.fillStyle = '#D07080';
-            ctx.fillRect(cx + 2, cy - 2, 16, 12);
-            // Cushion divider line
-            ctx.fillStyle = '#B06068';
-            ctx.fillRect(cx - 1, cy - 1, 2, 10);
-            // Seat highlights
-            ctx.fillStyle = '#E88898';
-            ctx.fillRect(cx - 16, cy, 12, 2);
-            ctx.fillRect(cx + 4, cy, 12, 2);
-            // Armrests
-            ctx.fillStyle = '#B05868';
-            ctx.fillRect(cx - 22, cy - 8, 4, 18);
-            ctx.fillRect(cx + 18, cy - 8, 4, 18);
-            // Armrest top highlight
+            ctx.fillRect(sx, sy, sw, 10*F);
+            // Back highlight
+            ctx.fillStyle = '#C06878';
+            ctx.fillRect(sx + 2*F, sy + 1*F, sw - 4*F, 3*F);
+            // Seat base
             ctx.fillStyle = '#C86878';
-            ctx.fillRect(cx - 22, cy - 8, 4, 3);
-            ctx.fillRect(cx + 18, cy - 8, 4, 3);
-            // Pillow detail
-            ctx.fillStyle = '#E8A0A8';
-            ctx.fillRect(cx - 14, cy - 10, 8, 5);
-            ctx.fillRect(cx + 6, cy - 10, 8, 5);
+            ctx.fillRect(sx, sy + 8*F, sw, sh - 8*F);
+            // Left cushion
+            ctx.fillStyle = '#E08090';
+            ctx.fillRect(sx + 2*F, sy + 10*F, sw/2 - 3*F, sh - 12*F);
+            // Right cushion
+            ctx.fillStyle = '#D87888';
+            ctx.fillRect(sx + sw/2 + 1*F, sy + 10*F, sw/2 - 3*F, sh - 12*F);
+            // Cushion highlights
+            ctx.fillStyle = '#F0A0A8';
+            ctx.fillRect(sx + 4*F, sy + 12*F, sw/2 - 7*F, 2*F);
+            ctx.fillRect(sx + sw/2 + 3*F, sy + 12*F, sw/2 - 7*F, 2*F);
+            // Divider
+            ctx.fillStyle = '#B06068';
+            ctx.fillRect(sx + sw/2 - 1*F, sy + 10*F, 2*F, sh - 12*F);
+            // Decorative pillows
+            ctx.fillStyle = '#E8A8B0';
+            ctx.fillRect(sx + 4*F, sy + 3*F, 8*F, 6*F);
+            ctx.fillRect(sx + sw - 12*F, sy + 3*F, 8*F, 6*F);
+            ctx.fillStyle = '#F0B8C0';
+            ctx.fillRect(sx + 5*F, sy + 4*F, 6*F, 4*F);
+            ctx.fillRect(sx + sw - 11*F, sy + 4*F, 6*F, 4*F);
             break;
         }
 
@@ -1403,6 +1422,49 @@ function drawFurniturePixel(ctx, type, x, y) {
 // ===== BEHAVIOR-DRIVEN AGENT SYSTEM =====
 // Agents have behaviors: 'idle' (wander/coffee), 'working' (sit at desk), 'meeting' (go to meeting room)
 
+// BFS pathfinding — returns array of {x,y} waypoints (1 tile per step)
+function calculatePath(fromX, fromY, toX, toY) {
+    fromX = Math.round(fromX); fromY = Math.round(fromY);
+    toX = Math.round(toX); toY = Math.round(toY);
+    if (fromX === toX && fromY === toY) return [];
+
+    const rows = state.layout.length;
+    const cols = state.layout[0]?.length || COLS;
+    const visited = new Set();
+    const queue = [[{x: fromX, y: fromY}]]; // each item is a path
+    visited.add(`${fromX},${fromY}`);
+
+    const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
+
+    while (queue.length > 0) {
+        const path = queue.shift();
+        const {x, y} = path[path.length - 1];
+
+        for (const d of dirs) {
+            const nx = x + d.dx, ny = y + d.dy;
+            const key = `${nx},${ny}`;
+            if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+            if (visited.has(key)) continue;
+            const tile = state.layout[ny]?.[nx];
+            if (!tile || tile === 'wall') continue;
+
+            visited.add(key);
+            const newPath = [...path, {x: nx, y: ny}];
+
+            if (nx === toX && ny === toY) {
+                return newPath.slice(1); // exclude starting position
+            }
+            queue.push(newPath);
+        }
+
+        // Safety: don't search too many tiles
+        if (visited.size > 200) break;
+    }
+
+    // No path found — return empty
+    return [];
+}
+
 function initAgentAnims() {
     state.agents.forEach(agent => {
         agentAnims[agent.id] = {
@@ -1417,6 +1479,7 @@ function initAgentAnims() {
             behaviorTimer: 3000 + Math.random() * 5000,
             deskTile: null,       // {x,y} of assigned desk when working
             idleTimer: 2000 + Math.random() * 6000,
+            waypoints: [],        // BFS path — array of {x,y} tiles to visit in order
         };
     });
 }
@@ -1487,15 +1550,15 @@ function updateAgentPositions(dt) {
         const newBehavior = agent.status === 'working' ? 'working'
             : agent.status === 'meeting' ? 'meeting' : 'idle';
 
-        // Behavior changed → trigger transition
         if (anim.behavior !== newBehavior) {
             anim.behavior = newBehavior;
             anim.sitting = false;
             anim.deskTile = null;
+            anim.waypoints = [];
             assignBehaviorTarget(agent, anim);
         }
 
-        const speed = 0.025;
+        const speed = 0.012; // slower, more natural walk
         const dx = anim.targetX - anim.x;
         const dy = anim.targetY - anim.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1512,33 +1575,39 @@ function updateAgentPositions(dt) {
                 anim.direction = dy > 0 ? 'down' : 'up';
             }
         } else {
+            // Arrived at current target tile
             anim.x = anim.targetX;
             anim.y = anim.targetY;
-            anim.walking = false;
 
-            if (anim.behavior === 'working' && anim.deskTile) {
-                // Arrived at desk → sit down, face the desk
-                anim.sitting = true;
-                const dxD = anim.deskTile.x - anim.x;
-                const dyD = anim.deskTile.y - anim.y;
-                if (Math.abs(dxD) > Math.abs(dyD)) {
-                    anim.direction = dxD > 0 ? 'right' : 'left';
-                } else {
-                    anim.direction = dyD > 0 ? 'down' : 'up';
-                }
-            } else if (anim.behavior === 'meeting') {
-                // In meeting room — face center, sit
-                anim.sitting = true;
+            // If more waypoints, move to next one
+            if (anim.waypoints.length > 0) {
+                const next = anim.waypoints.shift();
+                anim.targetX = next.x;
+                anim.targetY = next.y;
+                anim.walking = true;
             } else {
-                // Idle/coffee — wander periodically
-                anim.idleTimer -= dt;
-                if (anim.idleTimer <= 0) {
-                    anim.idleTimer = 4000 + Math.random() * 8000;
-                    if (Math.random() < 0.3) {
-                        // Occasionally go toward coffee or gather
-                        assignIdleTarget(agent, anim);
+                anim.walking = false;
+
+                if (anim.behavior === 'working' && anim.deskTile) {
+                    anim.sitting = true;
+                    const dxD = anim.deskTile.x - anim.x;
+                    const dyD = anim.deskTile.y - anim.y;
+                    if (Math.abs(dxD) > Math.abs(dyD)) {
+                        anim.direction = dxD > 0 ? 'right' : 'left';
                     } else {
-                        randomWalk(agent, anim);
+                        anim.direction = dyD > 0 ? 'down' : 'up';
+                    }
+                } else if (anim.behavior === 'meeting') {
+                    anim.sitting = true;
+                } else {
+                    anim.idleTimer -= dt;
+                    if (anim.idleTimer <= 0) {
+                        anim.idleTimer = 4000 + Math.random() * 8000;
+                        if (Math.random() < 0.3) {
+                            assignIdleTarget(agent, anim);
+                        } else {
+                            randomWalk(agent, anim);
+                        }
                     }
                 }
             }
@@ -1547,12 +1616,12 @@ function updateAgentPositions(dt) {
 }
 
 function assignBehaviorTarget(agent, anim) {
+    const fromX = Math.round(anim.x), fromY = Math.round(anim.y);
+
     if (anim.behavior === 'working') {
-        // Find nearest desk, walk to adjacent tile
         const desks = findFurnitureTiles('desk');
         const monitors = findFurnitureTiles('monitor');
         const workstations = [...desks, ...monitors];
-        // Prefer desk in agent's team room
         const teamRoom = agent.team === 'build' ? 'dev'
             : agent.team === 'content' ? 'cont'
             : agent.team === 'academy' ? 'acad'
@@ -1563,43 +1632,56 @@ function assignBehaviorTarget(agent, anim) {
         for (const desk of pool.sort(() => Math.random() - 0.5)) {
             const spot = findAdjacentWalkable(desk.x, desk.y, agent.id);
             if (spot) {
-                anim.targetX = spot.x;
-                anim.targetY = spot.y;
-                anim.deskTile = { x: spot.faceX, y: spot.faceY };
+                const path = calculatePath(fromX, fromY, spot.x, spot.y);
+                if (path.length > 0) {
+                    anim.waypoints = path;
+                    anim.targetX = path[0].x;
+                    anim.targetY = path[0].y;
+                    anim.waypoints.shift();
+                    anim.deskTile = { x: spot.faceX, y: spot.faceY };
+                    return;
+                }
+            }
+        }
+    } else if (anim.behavior === 'meeting') {
+        const meetTiles = findRoomTiles('meet');
+        const spot = findNearestUnoccupied(meetTiles, fromX, fromY, agent.id);
+        if (spot) {
+            const path = calculatePath(fromX, fromY, spot.x, spot.y);
+            if (path.length > 0) {
+                anim.waypoints = path;
+                anim.targetX = path[0].x;
+                anim.targetY = path[0].y;
+                anim.waypoints.shift();
                 return;
             }
         }
-        // Fallback: just stay
-    } else if (anim.behavior === 'meeting') {
-        // Go to meeting room
-        const meetTiles = findRoomTiles('meet');
-        const spot = findNearestUnoccupied(meetTiles, Math.round(anim.x), Math.round(anim.y), agent.id);
-        if (spot) {
-            anim.targetX = spot.x;
-            anim.targetY = spot.y;
-        }
     } else {
-        // Idle — let normal wander happen
         anim.idleTimer = 1000;
     }
 }
 
 function assignIdleTarget(agent, anim) {
+    const fromX = Math.round(anim.x), fromY = Math.round(anim.y);
     const roll = Math.random();
+
     if (roll < 0.4) {
-        // Go near coffee machine
         const coffees = findFurnitureTiles('coffee');
         if (coffees.length > 0) {
             const coffee = coffees[Math.floor(Math.random() * coffees.length)];
             const spot = findAdjacentWalkable(coffee.x, coffee.y, agent.id);
             if (spot) {
-                anim.targetX = spot.x;
-                anim.targetY = spot.y;
-                return;
+                const path = calculatePath(fromX, fromY, spot.x, spot.y);
+                if (path.length > 0) {
+                    anim.waypoints = path;
+                    anim.targetX = path[0].x;
+                    anim.targetY = path[0].y;
+                    anim.waypoints.shift();
+                    return;
+                }
             }
         }
     } else if (roll < 0.6) {
-        // Go near another idle agent (socialize)
         const idleAgents = state.agents.filter(a =>
             a.id !== agent.id && a.status === 'idle' && agentAnims[a.id]
         );
@@ -1608,13 +1690,17 @@ function assignIdleTarget(agent, anim) {
             const ba = agentAnims[buddy.id];
             const spot = findAdjacentWalkable(Math.round(ba.x), Math.round(ba.y), agent.id);
             if (spot) {
-                anim.targetX = spot.x;
-                anim.targetY = spot.y;
-                return;
+                const path = calculatePath(fromX, fromY, spot.x, spot.y);
+                if (path.length > 0) {
+                    anim.waypoints = path;
+                    anim.targetX = path[0].x;
+                    anim.targetY = path[0].y;
+                    anim.waypoints.shift();
+                    return;
+                }
             }
         }
     }
-    // Default: random walk
     randomWalk(agent, anim);
 }
 
@@ -1747,6 +1833,7 @@ async function loadData() {
         initChatInput();
         initTaskBoard();
         initAgentModal();
+        initServerModal();
 
         // Start ambient behaviors
         startAmbientBehaviors();
@@ -1820,6 +1907,9 @@ function initTabs() {
                     renderTaskBoard();
                     updateTaskBadge();
                 });
+            }
+            if (tab.dataset.tab === 'settings') {
+                renderSettings();
             }
         });
     });
@@ -2116,6 +2206,45 @@ function renderOrgChart() {
 }
 
 // ===== AGENT MODAL =====
+async function populateModelServerDropdown(selectedServerId, selectedModel) {
+    const serverSelect = document.getElementById('modalModelServer');
+    const modelSelect = document.getElementById('modalModel');
+    if (!serverSelect || !modelSelect) return;
+
+    let servers = [];
+    try {
+        const res = await fetch('/api/model-servers');
+        const data = await res.json();
+        servers = Array.isArray(data) ? data : Object.values(data);
+    } catch (e) {}
+
+    serverSelect.innerHTML = servers.map(s =>
+        `<option value="${s.id}">${s.name}</option>`
+    ).join('') || '<option value="default">기본 (OpenAI)</option>';
+
+    // Cache server data on the select element for cascading
+    serverSelect._servers = servers;
+
+    serverSelect.onchange = () => {
+        const sid = serverSelect.value;
+        const srv = (serverSelect._servers || []).find(s => s.id === sid);
+        const models = srv?.models || ['gpt-4o-mini'];
+        modelSelect.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+    };
+}
+
+function setModalModelServer(serverId, model) {
+    const serverSelect = document.getElementById('modalModelServer');
+    const modelSelect = document.getElementById('modalModel');
+    if (!serverSelect || !modelSelect) return;
+
+    serverSelect.value = serverId;
+    // Trigger cascading update
+    serverSelect.dispatchEvent(new Event('change'));
+    // Set model after models are populated
+    setTimeout(() => { modelSelect.value = model; }, 0);
+}
+
 async function openAgentModal(agentId) {
     const modal = document.getElementById('agentModal');
     const title = document.getElementById('modalTitle');
@@ -2129,6 +2258,9 @@ async function openAgentModal(agentId) {
             supSelect.innerHTML += `<option value="${a.id}">${a.name} (${a.role})</option>`;
         }
     });
+
+    // Populate model server dropdown
+    await populateModelServerDropdown();
 
     if (agentId) {
         // Edit mode
@@ -2151,6 +2283,7 @@ async function openAgentModal(agentId) {
             document.getElementById('modalKeywords').value = (agent.keywords || []).join(', ');
             document.getElementById('modalColor').value = agent.avatar_color || '#3B82F6';
             setColorSwatch(agent.avatar_color);
+            setModalModelServer(agent.model_server || 'default', agent.model || 'gpt-4o-mini');
         } catch (e) {
             console.error('Failed to load agent:', e);
         }
@@ -2170,6 +2303,7 @@ async function openAgentModal(agentId) {
         document.getElementById('modalKeywords').value = '';
         document.getElementById('modalColor').value = '#3B82F6';
         setColorSwatch('#3B82F6');
+        setModalModelServer('default', 'gpt-4o-mini');
     }
 
     modal.style.display = 'flex';
@@ -2225,6 +2359,8 @@ async function saveAgent() {
         skills: document.getElementById('modalSkills').value.split(',').map(s => s.trim()).filter(Boolean),
         keywords: document.getElementById('modalKeywords').value.split(',').map(s => s.trim()).filter(Boolean),
         avatar_color: document.getElementById('modalColor').value,
+        model_server: document.getElementById('modalModelServer').value || 'default',
+        model: document.getElementById('modalModel').value || 'gpt-4o-mini',
     };
 
     if (!data.name) {
@@ -2759,6 +2895,162 @@ function toggleReport(taskId) {
 
 // Make toggleReport globally accessible
 window.toggleReport = toggleReport;
+
+// ===== SETTINGS TAB =====
+
+async function renderSettings() {
+    const cardsEl = document.getElementById('serverCards');
+    if (!cardsEl) return;
+
+    let servers = [];
+    try {
+        const res = await fetch('/api/model-servers');
+        const data = await res.json();
+        servers = Array.isArray(data) ? data : Object.values(data);
+    } catch (e) {
+        cardsEl.innerHTML = '<p style="color:var(--text-secondary);font-size:12px">서버 목록을 불러올 수 없습니다.</p>';
+        return;
+    }
+
+    if (servers.length === 0) {
+        cardsEl.innerHTML = '<p style="color:var(--text-secondary);font-size:12px">등록된 서버가 없습니다.</p>';
+        return;
+    }
+
+    cardsEl.innerHTML = servers.map(srv => {
+        const modelsHtml = (srv.models || []).map(m => `<span class="server-model-tag">${m}</span>`).join('');
+        const isDefault = srv.id === 'default';
+        return `
+            <div class="server-card" data-server-id="${srv.id}">
+                <div class="server-card-header">
+                    <span class="server-card-name">${srv.name}</span>
+                    <span class="server-card-type">${srv.type}</span>
+                </div>
+                <div class="server-card-url">${srv.api_base || ''}</div>
+                <div class="server-card-models">${modelsHtml || '<span style="color:var(--text-secondary);font-size:10px">모델 없음</span>'}</div>
+                <div class="server-card-actions">
+                    <button class="server-action-btn test" onclick="testServer('${srv.id}', this)">테스트</button>
+                    <button class="server-action-btn" onclick="openServerModal('${srv.id}')">편집</button>
+                    ${isDefault ? '' : `<button class="server-action-btn danger" onclick="deleteServer('${srv.id}')">삭제</button>`}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function testServer(serverId, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    try {
+        const res = await fetch(`/api/model-servers/${serverId}/test`, { method: 'POST' });
+        const data = await res.json();
+        const dot = btn.closest('.server-card').querySelector('.server-card-header');
+        if (data.success) {
+            showToast(`연결 성공: ${data.models?.length || 0}개 모델 확인`);
+        } else {
+            showToast(`연결 실패: ${data.error || '알 수 없는 오류'}`);
+        }
+    } catch (e) {
+        showToast('연결 테스트 오류');
+    }
+    btn.textContent = orig;
+    btn.disabled = false;
+}
+
+async function deleteServer(serverId) {
+    if (!confirm('이 서버를 삭제하시겠습니까? 해당 서버를 사용하는 직원은 기본 서버로 변경됩니다.')) return;
+    await fetch(`/api/model-servers/${serverId}`, { method: 'DELETE' });
+    renderSettings();
+    showToast('서버가 삭제되었습니다');
+}
+
+async function openServerModal(serverId) {
+    const modal = document.getElementById('serverModal');
+    document.getElementById('serverModalTitle').textContent = serverId ? 'LLM 서버 편집' : 'LLM 서버 추가';
+    document.getElementById('serverModalId').value = serverId || '';
+
+    if (serverId) {
+        try {
+            const res = await fetch('/api/model-servers');
+            const rawData = await res.json();
+            const servers = Array.isArray(rawData) ? rawData : Object.values(rawData);
+            const srv = servers.find(s => s.id === serverId);
+            if (srv) {
+                document.getElementById('serverName').value = srv.name || '';
+                document.getElementById('serverType').value = srv.type || 'openai';
+                document.getElementById('serverApiBase').value = srv.api_base || '';
+                document.getElementById('serverApiKey').value = '';  // masked
+                document.getElementById('serverModels').value = (srv.models || []).join(', ');
+                document.getElementById('serverDefaultModel').value = srv.default_model || '';
+            }
+        } catch (e) {}
+    } else {
+        document.getElementById('serverName').value = '';
+        document.getElementById('serverType').value = 'openai';
+        document.getElementById('serverApiBase').value = '';
+        document.getElementById('serverApiKey').value = '';
+        document.getElementById('serverModels').value = '';
+        document.getElementById('serverDefaultModel').value = '';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function initServerModal() {
+    document.getElementById('closeServerModal').addEventListener('click', () => {
+        document.getElementById('serverModal').style.display = 'none';
+    });
+    document.getElementById('serverModalCancel').addEventListener('click', () => {
+        document.getElementById('serverModal').style.display = 'none';
+    });
+    document.getElementById('serverModal').addEventListener('click', e => {
+        if (e.target.id === 'serverModal') document.getElementById('serverModal').style.display = 'none';
+    });
+
+    document.getElementById('serverModalTest').addEventListener('click', async () => {
+        const btn = document.getElementById('serverModalTest');
+        const serverId = document.getElementById('serverModalId').value;
+        if (!serverId) { showToast('저장 후 테스트하세요'); return; }
+        btn.textContent = '테스트 중…';
+        await testServer(serverId, { textContent: '테스트 중…', disabled: false });
+        btn.textContent = '연결 테스트';
+    });
+
+    document.getElementById('serverModalSave').addEventListener('click', async () => {
+        const serverId = document.getElementById('serverModalId').value;
+        const data = {
+            name: document.getElementById('serverName').value.trim(),
+            type: document.getElementById('serverType').value,
+            api_base: document.getElementById('serverApiBase').value.trim(),
+            api_key: document.getElementById('serverApiKey').value.trim(),
+            models: document.getElementById('serverModels').value.split(',').map(s => s.trim()).filter(Boolean),
+            default_model: document.getElementById('serverDefaultModel').value.trim(),
+        };
+        if (!data.name) { showToast('서버 이름을 입력하세요'); return; }
+
+        const url = serverId ? `/api/model-servers/${serverId}` : '/api/model-servers';
+        const method = serverId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            document.getElementById('serverModal').style.display = 'none';
+            renderSettings();
+            showToast(serverId ? '서버가 수정되었습니다' : '서버가 추가되었습니다');
+        } else {
+            showToast('저장 실패');
+        }
+    });
+
+    document.getElementById('addServerBtn').addEventListener('click', () => openServerModal(null));
+}
+
+window.testServer = testServer;
+window.deleteServer = deleteServer;
+window.openServerModal = openServerModal;
 
 // ===== TOAST NOTIFICATION =====
 function showToast(message) {
