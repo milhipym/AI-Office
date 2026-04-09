@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.local
+
+# Data
+data/chat_history.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -98,25 +98,46 @@ const FURNITURE_DISPLAY = {
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
+    initMarkdown();
     initTabs();
     loadData();
 });
 
+function initMarkdown() {
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            highlight: function(code, lang) {
+                if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return code;
+            },
+        });
+    }
+}
+
 async function loadData() {
     try {
-        const [agentsRes, chatRes, furnitureRes, orgRes] = await Promise.all([
+        const [agentsRes, chatRes, furnitureRes, orgRes, statusRes] = await Promise.all([
             fetch('/api/agents'),
             fetch('/api/chat'),
             fetch('/api/furniture'),
             fetch('/api/org'),
+            fetch('/api/status'),
         ]);
 
         state.agents = await agentsRes.json();
         state.chatMessages = await chatRes.json();
         state.furniture = await furnitureRes.json();
         state.orgData = await orgRes.json();
+        state.apiStatus = await statusRes.json();
         state.placedItems = { ...DEFAULT_FURNITURE };
 
+        renderApiBadge();
         renderOffice();
         renderAgentStatusBar();
         renderChat();
@@ -126,6 +147,18 @@ async function loadData() {
         startAgentAnimations();
     } catch (err) {
         console.error('Failed to load data:', err);
+    }
+}
+
+function renderApiBadge() {
+    const badge = document.getElementById('apiBadge');
+    if (!badge) return;
+    if (state.apiStatus?.openai_configured) {
+        badge.textContent = '🟢 OpenAI 연결됨';
+        badge.classList.add('connected');
+    } else {
+        badge.textContent = '⚠️ OPENAI_API_KEY 미설정';
+        badge.classList.add('disconnected');
     }
 }
 
@@ -324,30 +357,170 @@ function renderChatMessages() {
     container.innerHTML = '';
 
     state.chatMessages.forEach(msg => {
-        const agent = state.agents.find(a => a.id === msg.agent);
-        const isUser = msg.agent === 'user';
+        container.appendChild(buildMessageElement(msg));
+    });
 
-        const el = document.createElement('div');
-        el.className = `chat-message ${isUser ? 'user' : ''}`;
-        el.innerHTML = `
-            <div class="chat-msg-avatar" style="background: ${isUser ? '#ef4444' : (agent?.avatar_color || '#666')}">
-                ${isUser ? '나' : (agent?.name.charAt(0) || '?')}
-            </div>
-            <div class="chat-msg-content">
-                <div class="chat-msg-header">
-                    <span class="chat-msg-name">${isUser ? '대표 (나)' : (agent?.name || 'Unknown')}</span>
-                    <span class="chat-msg-time">${msg.time}</span>
-                    <span class="chat-msg-type ${msg.type}">${getTypeLabel(msg.type)}</span>
-                </div>
-                <div class="chat-msg-text">${msg.message}</div>
+    // Apply syntax highlighting after DOM insertion
+    if (typeof hljs !== 'undefined') {
+        container.querySelectorAll('pre code').forEach(block => {
+            hljs.highlightElement(block);
+        });
+    }
+
+    container.scrollTop = container.scrollHeight;
+}
+
+function buildMessageElement(msg) {
+    const agent = state.agents.find(a => a.id === msg.agent);
+    const isUser = msg.agent === 'user';
+
+    const el = document.createElement('div');
+    el.className = `chat-message ${isUser ? 'user' : ''}`;
+
+    // Avatar
+    const avatar = document.createElement('div');
+    avatar.className = 'chat-msg-avatar';
+    avatar.style.background = isUser ? '#ef4444' : (agent?.avatar_color || '#666');
+    avatar.textContent = isUser ? '나' : (agent?.name?.charAt(0) || '?');
+
+    // Content wrapper
+    const content = document.createElement('div');
+    content.className = 'chat-msg-content';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'chat-msg-header';
+    header.innerHTML = `
+        <span class="chat-msg-name">${isUser ? '대표 (나)' : (agent?.name || 'Unknown')}</span>
+        <span class="chat-msg-time">${escapeHtml(msg.time || '')}</span>
+        <span class="chat-msg-type ${msg.type || 'report'}">${getTypeLabel(msg.type)}</span>
+        ${msg.metadata?.model ? `<span class="chat-msg-meta">${escapeHtml(msg.metadata.model)}${msg.metadata.latency_ms ? ' · ' + msg.metadata.latency_ms + 'ms' : ''}</span>` : ''}
+    `;
+    content.appendChild(header);
+
+    // Body: markdown text
+    const body = document.createElement('div');
+    body.className = 'chat-msg-text';
+    body.innerHTML = renderMarkdown(msg.message || '');
+    content.appendChild(body);
+
+    // Dedicated code blocks (structured)
+    if (msg.code_blocks && msg.code_blocks.length > 0) {
+        // If the markdown already contains the same fenced blocks, the body
+        // will render them. We additionally render a "file tree" header for
+        // multi-file outputs and ensure every block has a copy button.
+        enhanceCodeBlocks(body, msg.code_blocks);
+    }
+
+    // Images (DALL-E)
+    if (msg.images && msg.images.length > 0) {
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'chat-msg-images';
+        msg.images.forEach(img => {
+            const fig = document.createElement('figure');
+            fig.className = 'chat-image-figure';
+            fig.innerHTML = `
+                <img src="${escapeAttr(img.url)}" alt="${escapeAttr(img.prompt || 'Generated image')}" loading="lazy" class="chat-image">
+                <figcaption>
+                    <span class="chat-image-prompt">${escapeHtml(img.prompt || '')}</span>
+                    <a href="${escapeAttr(img.url)}" target="_blank" rel="noopener" class="chat-image-download">원본 열기 ↗</a>
+                </figcaption>
+            `;
+            imgWrap.appendChild(fig);
+        });
+        content.appendChild(imgWrap);
+    }
+
+    // Citations (Perplexity)
+    if (msg.citations && msg.citations.length > 0) {
+        const citWrap = document.createElement('div');
+        citWrap.className = 'citation-list';
+        citWrap.innerHTML = `<div class="citation-title">📚 출처</div>`;
+        msg.citations.forEach(c => {
+            const item = document.createElement('a');
+            item.className = 'citation-item';
+            item.href = c.url;
+            item.target = '_blank';
+            item.rel = 'noopener';
+            item.innerHTML = `
+                <span class="citation-index">[${c.index}]</span>
+                <span class="citation-text">${escapeHtml(c.title || c.url)}</span>
+            `;
+            citWrap.appendChild(item);
+        });
+        content.appendChild(citWrap);
+    }
+
+    el.appendChild(avatar);
+    el.appendChild(content);
+    return el;
+}
+
+function renderMarkdown(text) {
+    if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+    try {
+        // marked.parse supports ```lang:filename — we handle this via post-processing
+        const raw = marked.parse(text);
+        return DOMPurify.sanitize(raw, {
+            ADD_ATTR: ['target', 'rel'],
+        });
+    } catch (e) {
+        console.error('Markdown render failed:', e);
+        return escapeHtml(text);
+    }
+}
+
+function enhanceCodeBlocks(container, codeBlocks) {
+    // Find all <pre><code> elements and attach copy buttons + filename headers.
+    const pres = container.querySelectorAll('pre');
+    pres.forEach((pre, idx) => {
+        const meta = codeBlocks[idx] || {};
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+        header.innerHTML = `
+            <span class="code-block-filename">
+                ${meta.filename ? '📄 ' + escapeHtml(meta.filename) : '💻 ' + (meta.language || 'code')}
+            </span>
+            <div class="code-block-actions">
+                <span class="code-block-lang">${escapeHtml(meta.language || '')}</span>
+                <button class="code-copy-btn" data-code-idx="${idx}">복사</button>
             </div>
         `;
 
-        container.appendChild(el);
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(header);
+        wrapper.appendChild(pre);
     });
 
-    // Scroll to bottom
-    container.scrollTop = container.scrollHeight;
+    // Wire up copy buttons
+    container.querySelectorAll('.code-copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const idx = parseInt(btn.dataset.codeIdx, 10);
+            const code = codeBlocks[idx]?.code || '';
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = '복사됨 ✓';
+                setTimeout(() => { btn.textContent = '복사'; }, 1500);
+            }).catch(() => {
+                btn.textContent = '실패';
+            });
+        });
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+}
+
+function escapeAttr(str) {
+    return escapeHtml(str).replace(/"/g, '&quot;');
 }
 
 function getTypeLabel(type) {
@@ -363,14 +536,78 @@ function getTypeLabel(type) {
 function initChatInput() {
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
+    const dropdown = document.getElementById('mentionDropdown');
+
+    const MENTION_LIST = [
+        { id: 'sonnet', name: 'Claude Sonnet', role: '개발자', icon: '💻' },
+        { id: 'opus', name: 'Claude Opus', role: 'CTO / 아키텍처', icon: '🏛️' },
+        { id: 'manus', name: 'Manus', role: 'PM / 기획', icon: '📋' },
+        { id: 'gemini', name: 'Gemini', role: '디자이너 / 이미지', icon: '🎨' },
+        { id: 'chatgpt', name: 'ChatGPT', role: '분석가', icon: '📊' },
+        { id: 'perplexity', name: 'Perplexity', role: '리서처 / 검색', icon: '🔎' },
+    ];
+
+    const updateMentionDropdown = () => {
+        const value = input.value;
+        const atMatch = value.match(/^@(\w*)$/);
+        if (!atMatch) {
+            dropdown.classList.remove('open');
+            dropdown.innerHTML = '';
+            return;
+        }
+        const prefix = atMatch[1].toLowerCase();
+        const filtered = MENTION_LIST.filter(m => m.id.startsWith(prefix));
+        if (filtered.length === 0) {
+            dropdown.classList.remove('open');
+            return;
+        }
+        dropdown.innerHTML = filtered.map(m => `
+            <div class="mention-item" data-id="${m.id}">
+                <span class="mention-icon">${m.icon}</span>
+                <div class="mention-info">
+                    <div class="mention-name">@${m.id}</div>
+                    <div class="mention-role">${m.name} · ${m.role}</div>
+                </div>
+            </div>
+        `).join('');
+        dropdown.classList.add('open');
+        dropdown.querySelectorAll('.mention-item').forEach(item => {
+            item.addEventListener('click', () => {
+                input.value = `@${item.dataset.id} `;
+                dropdown.classList.remove('open');
+                input.focus();
+            });
+        });
+    };
 
     const send = async () => {
         const message = input.value.trim();
         if (!message) return;
 
         input.value = '';
+        dropdown.classList.remove('open');
         input.disabled = true;
         sendBtn.disabled = true;
+
+        // Optimistic user message
+        const tempUser = {
+            agent: 'user',
+            message,
+            time: new Date().toTimeString().slice(0, 5),
+            type: 'command',
+        };
+        state.chatMessages.push(tempUser);
+
+        // Loading placeholder
+        const loadingMsg = {
+            agent: guessAgent(message),
+            message: '_🤔 생각 중..._',
+            time: new Date().toTimeString().slice(0, 5),
+            type: 'system',
+            _loading: true,
+        };
+        state.chatMessages.push(loadingMsg);
+        renderChatMessages();
 
         try {
             const res = await fetch('/api/chat', {
@@ -378,20 +615,29 @@ function initChatInput() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message }),
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
-            state.chatMessages.push(data.user_message);
+            // Replace optimistic + loading with real messages
+            state.chatMessages = state.chatMessages.filter(m => !m._loading);
+            // Replace last user msg (in case server normalized)
+            state.chatMessages[state.chatMessages.length - 1] = data.user_message;
+            state.chatMessages.push(data.ai_response);
             renderChatMessages();
 
-            // Simulate typing delay for AI response
-            setTimeout(() => {
-                state.chatMessages.push(data.ai_response);
-                renderChatMessages();
-                showToast('AI 직원이 응답했습니다');
-            }, 800 + Math.random() * 1200);
+            const agentName = state.agents.find(a => a.id === data.ai_response.agent)?.name || data.ai_response.agent;
+            showToast(`${agentName} 응답 완료`);
         } catch (err) {
             console.error('Send failed:', err);
-            showToast('메시지 전송에 실패했습니다');
+            state.chatMessages = state.chatMessages.filter(m => !m._loading);
+            state.chatMessages.push({
+                agent: 'manus',
+                message: `⚠️ 메시지 전송 실패: ${err.message}`,
+                time: new Date().toTimeString().slice(0, 5),
+                type: 'system',
+            });
+            renderChatMessages();
+            showToast('전송 실패');
         } finally {
             input.disabled = false;
             sendBtn.disabled = false;
@@ -401,8 +647,32 @@ function initChatInput() {
 
     sendBtn.addEventListener('click', send);
     input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') send();
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            send();
+        }
     });
+    input.addEventListener('input', updateMentionDropdown);
+}
+
+// Very rough client-side guess so the loading placeholder shows the right avatar
+function guessAgent(message) {
+    const m = message.trim();
+    const mention = m.match(/^@(\w+)/);
+    if (mention) {
+        const id = mention[1].toLowerCase();
+        const map = { opus: 'claude', claude: 'claude', sonnet: 'sonnet',
+                      manus: 'manus', gemini: 'gemini', chatgpt: 'chatgpt',
+                      gpt: 'chatgpt', perplexity: 'perplexity', ppl: 'perplexity' };
+        if (map[id]) return map[id];
+    }
+    const lower = m.toLowerCase();
+    if (/코드|구현|버그|함수|api 만들|code|implement/.test(lower)) return 'sonnet';
+    if (/아키텍처|설계|기술 스택|architecture/.test(lower)) return 'claude';
+    if (/검색|최신|트렌드|뉴스|search|latest/.test(lower)) return 'perplexity';
+    if (/이미지|로고|디자인|image|logo/.test(lower)) return 'gemini';
+    if (/분석|보고서|커리큘럼|analysis|report/.test(lower)) return 'chatgpt';
+    return 'manus';
 }
 
 // ===== ORG CHART =====
