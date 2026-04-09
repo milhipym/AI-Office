@@ -4,14 +4,27 @@ A pixel-art themed virtual office where AI agents work as employees.
 Each agent is backed by OpenAI API with a role-specific system prompt.
 """
 
+import random
 from datetime import datetime
 
 from flask import Flask, render_template, jsonify, request
 
 from agents import AGENTS
-from agents.router import route, strip_mention
+from agents.router import route, strip_mention, is_smalltalk
 from config import FLASK_DEBUG, FLASK_PORT, is_openai_configured
 from services import storage
+
+
+# Canned smalltalk replies — avoid burning tokens on "안녕"
+SMALLTALK_REPLIES = [
+    "안녕하세요! 👋 오늘은 어떤 작업을 도와드릴까요?",
+    "반갑습니다! 작업 지시는 `@sonnet`, `@gemini` 같은 멘션으로 시작해 주세요.",
+    "안녕하세요, 대표님. AI Office 직원 6명이 대기 중입니다. 어떤 업무부터 할까요?",
+    "네, 듣고 있습니다! 구체적인 지시를 내려주시면 담당 에이전트가 처리합니다.",
+    "안녕하세요! 💼 코드 / 디자인 / 기획 / 리서치 / 분석 중 어느 쪽 도움이 필요하세요?",
+]
+
+SMALLTALK_AGENTS = ["manus", "chatgpt", "claude"]
 
 app = Flask(__name__)
 
@@ -132,6 +145,25 @@ def send_message():
         "type": "command",
     }
     storage.append_message(user_msg_record)
+
+    # Smalltalk bypass — no LLM call for pure greetings
+    if is_smalltalk(user_message):
+        agent_id = random.choice(SMALLTALK_AGENTS)
+        ai_msg_record = {
+            "agent": agent_id,
+            "message": random.choice(SMALLTALK_REPLIES),
+            "time": datetime.now().strftime("%H:%M"),
+            "type": "report",
+            "code_blocks": [],
+            "images": [],
+            "citations": [],
+            "metadata": {"bypass": "smalltalk", "agent": agent_id},
+        }
+        storage.append_message(ai_msg_record)
+        return jsonify({
+            "user_message": user_msg_record,
+            "ai_response": ai_msg_record,
+        })
 
     # Route to the appropriate agent
     agent = route(user_message, channel=channel)

@@ -7,6 +7,38 @@ from . import AGENTS
 from .base import BaseAgent
 
 
+# Simple greetings / small talk — we bypass the LLM for these
+SMALLTALK_PATTERNS = [
+    r"^(안녕|안뇽|안뇨|하이|헬로|헤이|반가워|반갑|ㅎㅇ|방가|헐로)",
+    r"^(hi|hello|hey|yo|sup|howdy|greetings)\W*$",
+    r"^잘\s*지내",
+    r"^뭐\s*해",
+    r"^좋은\s*(아침|저녁|오후|밤|하루)",
+    r"^(고마워|감사|thanks|thank\s*you|thx|ty)\W*$",
+    r"^(수고|고생)(했|하셨)",
+    r"^(ㅋㅋ+|ㅎㅎ+|ㅠㅠ+|lol|haha)\W*$",
+    r"^(네|예|응|어|ok|okay|yes|no|아니|좋아)\W*$",
+    r"^(뭐|what)\?*$",
+    r"^test\W*$",
+    r"^테스트\W*$",
+]
+
+
+def is_smalltalk(message: str) -> bool:
+    """Return True for greetings / trivial chat that shouldn't trigger a full LLM call."""
+    m = message.strip().lower()
+    if not m or len(m) > 25:
+        return False
+    # Strip leading @mention so "@sonnet 안녕" is still caught
+    m_clean = re.sub(r"^@\w+\s*", "", m).strip()
+    if not m_clean or len(m_clean) > 20:
+        return False
+    for pattern in SMALLTALK_PATTERNS:
+        if re.search(pattern, m_clean, re.IGNORECASE):
+            return True
+    return False
+
+
 # Keyword rules, evaluated in order. First match wins.
 KEYWORD_RULES = [
     (
