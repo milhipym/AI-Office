@@ -1,23 +1,24 @@
 /* ============================================
-   AI OFFICE - Pixel Art Theme Stylesheet
+   AI OFFICE - Bright Theme Stylesheet
    ============================================ */
 
 :root {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-tertiary: #0f3460;
-    --bg-card: #1e2a4a;
-    --text-primary: #e8e8e8;
-    --text-secondary: #a0a0b8;
-    --text-accent: #ffd700;
-    --accent-blue: #4a90d9;
-    --accent-purple: #8b5cf6;
-    --accent-green: #10b981;
-    --accent-red: #ef4444;
-    --accent-orange: #f59e0b;
-    --accent-pink: #ec4899;
-    --border-color: #2a3a5e;
-    --pixel-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+    /* Bright theme: light grounds, dark ink, accents dark enough for white text. */
+    --bg-primary: #f4f6fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #eceffa;
+    --bg-card: #ffffff;
+    --text-primary: #1f2430;
+    --text-secondary: #5a6272;
+    --text-accent: #5b4bc4;
+    --accent-blue: #3c6fcb;
+    --accent-purple: #6d50d8;
+    --accent-green: #1f8a5f;
+    --accent-red: #c93c3c;
+    --accent-orange: #b86a00;
+    --accent-pink: #c2408a;
+    --border-color: #dde2ea;
+    --pixel-shadow: 2px 2px 0px rgba(31, 36, 48, 0.08);
     --grid-floor: #c8c8c8;
     --grid-wall: #8a8a9a;
     --room-floor: #d4d4d4;
@@ -41,8 +42,8 @@ body {
 .pixel-border {
     border: 3px solid var(--border-color);
     box-shadow:
-        inset -2px -2px 0px rgba(0,0,0,0.3),
-        inset 2px 2px 0px rgba(255,255,255,0.1),
+        inset -2px -2px 0px rgba(31,36,48,0.06),
+        inset 2px 2px 0px rgba(255,255,255,0.6),
         var(--pixel-shadow);
 }
 
@@ -52,7 +53,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 10px 20px;
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    background: var(--bg-secondary);
     border-bottom: 3px solid var(--border-color);
     position: sticky;
     top: 0;
@@ -75,9 +76,8 @@ body {
 }
 
 .logo-icon {
-    font-size: 12px;
-    color: var(--accent-green);
-    letter-spacing: 2px;
+    display: block;
+    flex-shrink: 0;
 }
 
 .logo-text {
@@ -364,7 +364,7 @@ body {
     background: #8B6914;
     border: 2px solid #6B4914;
     border-radius: 2px;
-    box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+    box-shadow: 2px 2px 0px rgba(31,36,48,0.08);
 }
 
 .furniture-chair {
@@ -450,7 +450,7 @@ body {
     background: #c0392b;
     border: 2px solid #962d22;
     border-radius: 3px 3px 1px 1px;
-    box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+    box-shadow: 2px 2px 0px rgba(31,36,48,0.08);
 }
 
 .furniture-monitor {
@@ -584,7 +584,7 @@ body {
     color: var(--text-secondary);
     line-height: 1.6;
     padding: 8px;
-    background: rgba(0,0,0,0.2);
+    background: var(--bg-tertiary);
     border-radius: 4px;
 }
 
@@ -994,7 +994,7 @@ body {
 
 .org-card:hover {
     transform: translateY(-3px);
-    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.5);
+    box-shadow: 4px 4px 0px rgba(31, 36, 48, 0.12);
 }
 
 .org-card-title {
@@ -1287,7 +1287,7 @@ body {
     font-size: 13px;
     z-index: 1000;
     transition: transform 0.3s;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(31, 36, 48, 0.12);
 }
 
 .toast.show {
@@ -1381,7 +1381,7 @@ textarea.chat-input {
     background: var(--bg-card);
     border: 2px solid var(--accent-blue);
     border-radius: 4px;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 -4px 20px rgba(31, 36, 48, 0.12);
     display: none;
     z-index: 50;
     overflow: hidden;
@@ -1410,9 +1410,9 @@ textarea.chat-input {
 }
 
 .mention-icon {
-    font-size: 20px;
     width: 32px;
-    text-align: center;
+    display: flex;
+    justify-content: center;
 }
 
 .mention-info {
@@ -1524,15 +1524,15 @@ textarea.chat-input {
 }
 
 .chat-msg-text tbody tr:nth-child(odd) {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(31, 36, 48, 0.03);
 }
 
 /* Inline code */
 .chat-msg-text code {
     font-family: 'JetBrains Mono', 'Consolas', monospace;
     font-size: 12px;
-    background: rgba(0, 0, 0, 0.3);
-    color: #f8f8f2;
+    background: #f1f3f7;
+    color: #2b3140;
     padding: 2px 6px;
     border-radius: 3px;
     border: 1px solid var(--border-color);
@@ -1544,7 +1544,7 @@ textarea.chat-input {
     border: 2px solid var(--border-color);
     border-radius: 4px;
     overflow: hidden;
-    background: #0d1117;
+    background: #f6f8fa;
 }
 
 .code-block-header {
@@ -1601,7 +1601,7 @@ textarea.chat-input {
 .code-block-wrapper pre {
     margin: 0 !important;
     padding: 12px 16px;
-    background: #0d1117 !important;
+    background: #f6f8fa !important;
     overflow-x: auto;
     font-family: 'JetBrains Mono', 'Consolas', monospace;
     font-size: 12px;
@@ -1613,13 +1613,13 @@ textarea.chat-input {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    color: #c9d1d9;
+    color: #24292f;
 }
 
 /* Fallback pre (no wrapper) */
 .chat-msg-text pre:not(.code-block-wrapper pre) {
-    background: #0d1117;
-    color: #c9d1d9;
+    background: #f6f8fa;
+    color: #24292f;
     padding: 12px;
     border-radius: 4px;
     border: 1px solid var(--border-color);
@@ -1716,7 +1716,7 @@ textarea.chat-input {
     font-size: 11px;
     color: var(--text-secondary);
     text-decoration: none;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    border-bottom: 1px dashed var(--border-color);
 }
 
 .citation-item:last-child {
@@ -2388,7 +2388,14 @@ textarea.chat-input {
 }
 
 .cal-side-date.today::before {
-    content: '● ';
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: 6px;
+    vertical-align: middle;
 }
 
 .cal-item {
@@ -2454,4 +2461,118 @@ textarea.chat-input {
     .cal-chip b {
         display: none;
     }
+}
+
+/* ===== ICONS · BADGES · CHIPS (emoji-free UI) ===== */
+.ui-icon {
+    display: inline-block;
+    vertical-align: -2px;
+    flex-shrink: 0;
+}
+
+.agent-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    box-sizing: border-box;
+}
+
+.status-dot-inline {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: #9aa3b2;
+    vertical-align: 1px;
+}
+
+.status-dot-inline.working { background: var(--accent-green); }
+.status-dot-inline.meeting { background: var(--accent-blue); }
+
+.furniture-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    font-size: 10px;
+    font-weight: 600;
+    color: #3d4452;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(31, 36, 48, 0.08);
+    border-radius: 999px;
+    padding: 1px 7px 1px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.furniture-chip i {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.furniture-icon i {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: block;
+}
+
+.achievement-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: #2f6b12;
+    background: #e3f2d3;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    vertical-align: 1px;
+}
+
+.entry-kind.meeting { color: #4b3fa0; }
+
+.entry-impact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.citation-title,
+.chat-image-download,
+.code-block-filename,
+.cal-item-loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cal-ics {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+}
+
+.cal-ics:hover {
+    color: var(--accent-blue);
+}
+
+.brain-btn.warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* A seated staff member hides the furniture label under them (2D view). */
+.grid-cell.has-agent .furniture-chip {
+    display: none;
+}
+
+.agent-status-bar {
+    flex-wrap: wrap;
 }

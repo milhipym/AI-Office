@@ -12,16 +12,19 @@
 // (a failed static import would fail silently).
 let THREE, OrbitControls, CSS2DRenderer, CSS2DObject;
 
+// Bright pastel floors per room, matching the page's light theme.
 const ROOM_FLOOR = {
-    lobby: 0xe8dcc6,
-    records: 0xc9e6df,
-    meeting: 0xd8cfe9,
-    library: 0xf0dcc2,
-    studio: 0xeed3e2,
+    lobby: 0xfff1c9,
+    records: 0xd3f1e6,
+    meeting: 0xe6e0fa,
+    library: 0xffe3d4,
+    studio: 0xdcebfb,
 };
-const HALL_FLOOR = 0xb8b8c8;
-const WALL = 0xece7df;
-const WALL_TRIM = 0x9c8f7d;
+const HALL_FLOOR = 0xe4e8ef;
+const WALL = 0xfbfaf7;
+const WALL_TRIM = 0xc9c2b6;
+const SCENE_BG = 0xeef2f8;
+const BASE_SLAB = 0xd5dbe5;
 const SKIN = 0xf1c27d;
 const STATUS_COLOR = { working: '#10b981', meeting: '#4a90d9', idle: '#a0a0b8' };
 
@@ -178,7 +181,7 @@ class Office3D {
         this.furnitureKey = '';
 
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a2e);
+        this.scene.background = new THREE.Color(SCENE_BG);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -199,8 +202,8 @@ class Office3D {
         this.controls.minZoom = 0.7;
         this.controls.maxZoom = 2.5;
 
-        this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.1));
-        const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+        this.scene.add(new THREE.HemisphereLight(0xffffff, 0xb8c2d6, 1.5));
+        const sun = new THREE.DirectionalLight(0xfff8ee, 1.2);
         sun.position.set(-4, 9, 6);
         sun.castShadow = true;
         sun.shadow.mapSize.set(1024, 1024);
@@ -241,13 +244,13 @@ class Office3D {
             c >= rm.x && c < rm.x + rm.w && r >= rm.y && r < rm.y + rm.h) || null;
 
         // Base slab and floor tiles (checkered by a shade per room).
-        this.world.add(at(box(cols + 0.3, 0.2, rows + 0.3, 0x2a3a5e), 0, -0.15, 0));
+        this.world.add(at(box(cols + 0.3, 0.2, rows + 0.3, BASE_SLAB), 0, -0.15, 0));
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const room = roomAt(c, r);
                 const base = new THREE.Color(room ? ROOM_FLOOR[room.theme] ?? HALL_FLOOR : HALL_FLOOR);
                 if ((r + c) % 2) base.multiplyScalar(0.95);
-                if (room?.planned) base.lerp(new THREE.Color(0x9a9aa8), 0.35);
+                if (room?.planned) base.lerp(new THREE.Color(0xc4cad6), 0.35);
                 const [x, z] = this.cellCenter(c, r);
                 const tile = at(box(1, 0.1, 1, base.getHex()), x, -0.05, z);
                 tile.castShadow = false;

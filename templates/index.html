@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Office - 가상 AI 오피스</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
     </style>
@@ -30,7 +30,7 @@
     <header class="header">
         <div class="header-left">
             <div class="logo pixel-border">
-                <span class="logo-icon">&#9632;&#9632;&#9632;</span>
+                <svg class="logo-icon" width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="2" width="11" height="11" rx="3" fill="#ffd9c7"/><rect x="15" y="2" width="11" height="11" rx="3" fill="#cdeee0"/><rect x="2" y="15" width="11" height="11" rx="3" fill="#e2dcf8"/><rect x="15" y="15" width="11" height="11" rx="3" fill="#fff0bf"/></svg>
                 <span class="logo-text">AI OFFICE</span>
             </div>
             <span class="header-subtitle">나만의 세컨브레인 오피스 · 직원 <span class="agent-count">7</span>명</span>
@@ -38,22 +38,22 @@
         </div>
         <nav class="nav-tabs">
             <button class="nav-tab active" data-tab="office">
-                <span class="tab-icon">&#9820;</span> 사무실
+                사무실
             </button>
             <button class="nav-tab" data-tab="chat">
-                <span class="tab-icon">&#9993;</span> 팀 채팅
+                팀 채팅
             </button>
             <button class="nav-tab" data-tab="brain">
-                <span class="tab-icon">&#9998;</span> 세컨브레인
+                세컨브레인
             </button>
             <button class="nav-tab" data-tab="calendar">
-                <span class="tab-icon">&#9783;</span> 일정표
+                일정표
             </button>
             <button class="nav-tab" data-tab="org">
-                <span class="tab-icon">&#9733;</span> 조직도
+                조직도
             </button>
             <button class="nav-tab" data-tab="customize">
-                <span class="tab-icon">&#9998;</span> 사무실 편집
+                사무실 편집
             </button>
         </nav>
         <div class="header-right">
@@ -70,8 +70,8 @@
         <!-- ===== OFFICE VIEW ===== -->
         <section id="tab-office" class="tab-content active">
             <div class="office-toolbar">
-                <button class="brain-btn" id="viewToggle">🗺️ 2D로 보기</button>
-                <button class="brain-btn" id="resetView">🎯 시점 초기화</button>
+                <button class="brain-btn" id="viewToggle">2D로 보기</button>
+                <button class="brain-btn" id="resetView">시점 초기화</button>
                 <span class="office-hint" id="officeHint"></span>
             </div>
             <div class="office-container">
@@ -83,7 +83,7 @@
                 <div class="agent-info-panel" id="agentInfoPanel">
                     <div class="panel-header">
                         <h3>직원 정보</h3>
-                        <button class="close-btn" id="closePanel">&times;</button>
+                        <button class="close-btn" id="closePanel" aria-label="닫기"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg></button>
                     </div>
                     <div class="panel-body" id="panelBody">
                         <p class="panel-hint">캐릭터를 클릭하면 정보가 표시됩니다</p>
@@ -117,11 +117,11 @@
                         <div class="chat-input-wrapper">
                             <textarea id="chatInput" placeholder="/기록 오늘 결제 모듈 타임아웃 원인 찾아서 배포함 (Shift+Enter 줄바꿈)" class="chat-input" rows="2"></textarea>
                             <button id="sendBtn" class="send-btn">
-                                <span>&#9654;</span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
                             </button>
                         </div>
                         <div id="mentionDropdown" class="mention-dropdown"></div>
-                        <p class="chat-hint">⌨️ /기록 · /회의 · /일정 · /찾기 · /주간 · /성과 · /비서 &nbsp;|&nbsp; 🛎️ 명령 없이 보내면 접수 매니저가 담당자에게 배정</p>
+                        <p class="chat-hint">/기록 · /회의 · /일정 · /찾기 · /주간 · /성과 · /비서 &nbsp;|&nbsp; 명령 없이 보내면 접수 매니저가 담당자에게 배정</p>
                     </div>
                 </div>
             </div>
@@ -139,9 +139,9 @@
                         <option value="meeting">회의록</option>
                     </select>
                     <div class="brain-actions">
-                        <button class="brain-btn" data-command="/주간">📊 이번 주 보고</button>
-                        <button class="brain-btn" data-command="/주간 지난주">📊 지난주 보고</button>
-                        <button class="brain-btn" data-command="/성과 올해">🧭 올해 성과 정리</button>
+                        <button class="brain-btn" data-command="/주간">이번 주 보고</button>
+                        <button class="brain-btn" data-command="/주간 지난주">지난주 보고</button>
+                        <button class="brain-btn" data-command="/성과 올해">올해 성과 정리</button>
                     </div>
                 </div>
                 <div class="brain-stats" id="brainStats"></div>
@@ -154,14 +154,14 @@
             <div class="cal-container">
                 <div class="cal-main">
                     <div class="cal-header">
-                        <button class="brain-btn" id="calPrev" aria-label="이전 달">◀</button>
+                        <button class="brain-btn" id="calPrev" aria-label="이전 달"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
                         <h3 class="cal-title" id="calTitle"></h3>
-                        <button class="brain-btn" id="calNext" aria-label="다음 달">▶</button>
+                        <button class="brain-btn" id="calNext" aria-label="다음 달"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                         <button class="brain-btn" id="calToday">오늘</button>
                         <div class="cal-actions">
                             <button class="brain-btn" id="calAdd">＋ 일정 추가</button>
                             <a class="brain-btn" href="/api/events.ics" download
-                               title="오늘 이후 일정을 .ics로 받아 Google · Apple · Outlook 캘린더에서 가져오기">📥 내보내기 (.ics)</a>
+                               title="오늘 이후 일정을 .ics로 받아 Google · Apple · Outlook 캘린더에서 가져오기">내보내기 (.ics)</a>
                         </div>
                     </div>
                     <div class="cal-weekdays">
@@ -183,7 +183,7 @@
         <section id="tab-org" class="tab-content">
             <div class="org-container">
                 <h2 class="org-title">AI Office Org Chart</h2>
-                <p class="org-subtitle">대표 → 접수 매니저 → 팀 · 새 팀은 agents/roster.py에 추가</p>
+                <p class="org-subtitle">대표 · 접수 매니저 · 팀 순서로 업무가 배정됩니다. 새 팀은 agents/roster.py에 추가</p>
                 <div class="org-chart" id="orgChart">
                     <!-- Org chart rendered by JS -->
                 </div>
@@ -204,7 +204,7 @@
                 </div>
                 <div class="customize-preview">
                     <div class="preview-header">
-                        <span class="pixel-badge">&#9998; 사무실 편집</span>
+                        <span class="pixel-badge">사무실 편집</span>
                         <button class="save-btn" id="saveOffice">저장하기</button>
                     </div>
                     <div class="customize-grid" id="customizeGrid">

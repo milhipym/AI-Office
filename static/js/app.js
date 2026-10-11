@@ -22,43 +22,63 @@ const state = {
     calSelected: null,  // 'YYYY-MM-DD' or null for "upcoming"
 };
 
-const AGENT_ICONS = {
-    dispatcher: '🛎️',
-    assistant: '💼',
-    scheduler: '📅',
-    archivist: '🗂️',
-    minutes: '📝',
-    finder: '🔎',
-    reporter: '📊',
-    coach: '🏆',
-};
-
 const STATUS_TEXT = {
     working: '작업 중',
     meeting: '회의 중',
     idle: '대기 중',
 };
 
-const STATUS_ICONS = {
-    working: '💻',
-    meeting: '🤝',
-    idle: '☕',
+// Stroke icons (no emoji anywhere in the UI). Decorative: aria-hidden.
+const ICON_PATHS = {
+    send: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+    close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+    download: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+    pin: '<path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>',
+    trend: '<path d="M4 16l5-5 4 4 7-7"/><path d="M15 8h5v5"/>',
+    file: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/>',
+    code: '<path d="M9 8l-4 4 4 4"/><path d="M15 8l4 4-4 4"/>',
+    link: '<path d="M14 5h5v5"/><path d="M19 5l-8 8"/><path d="M17 14v5H5V7h5"/>',
+    book: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>',
+    alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4"/><path d="M12 17v.5"/>',
 };
 
+function icon(name, size = 16) {
+    return `<svg class="ui-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" `
+        + `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
+}
+
+// Light fill in the staff color with dark text: readable on the bright theme
+// whatever the staff color is.
+function avatarStyle(color) {
+    const c = color || '#94a3b8';
+    return `background: color-mix(in srgb, ${c} 28%, #ffffff); border: 2px solid ${c}; color: #1f2430;`;
+}
+
+// Initial-letter badge in the staff member's color (replaces emoji icons).
+function agentBadge(agent, size = 28) {
+    const letter = escapeHtml((agent?.short_name || agent?.name || '?').charAt(0));
+    return `<span class="agent-badge" style="width:${size}px;height:${size}px;${avatarStyle(agent?.avatar_color)}">${letter}</span>`;
+}
+
+// Furniture chips use the same colors as the 3D models.
 const FURNITURE_DISPLAY = {
-    desk: { emoji: '🪑', label: '책상', cssClass: 'furniture-desk' },
-    chair: { emoji: '💺', label: '의자', cssClass: 'furniture-chair' },
-    plant: { emoji: '🌿', label: '화분', cssClass: 'furniture-plant' },
-    cactus: { emoji: '🌵', label: '선인장', cssClass: '' },
-    coffee: { emoji: '☕', label: '커피머신', cssClass: '' },
-    bookshelf: { emoji: '📚', label: '책장', cssClass: 'furniture-bookshelf' },
-    sofa: { emoji: '🛋️', label: '소파', cssClass: 'furniture-sofa' },
-    monitor: { emoji: '🖥️', label: '모니터', cssClass: 'furniture-monitor' },
-    bin: { emoji: '🗑️', label: '휴지통', cssClass: '' },
-    lamp: { emoji: '💡', label: '스탠드', cssClass: '' },
-    whiteboard: { emoji: '📋', label: '화이트보드', cssClass: '' },
-    rug: { emoji: '🟫', label: '러그', cssClass: '' },
+    desk: { label: '책상', color: '#b07a4a' },
+    chair: { label: '의자', color: '#3b5bdb' },
+    plant: { label: '화분', color: '#2f9e44' },
+    cactus: { label: '선인장', color: '#37b24d' },
+    coffee: { label: '커피머신', color: '#8d6e63' },
+    bookshelf: { label: '책장', color: '#8b5a2b' },
+    sofa: { label: '소파', color: '#1c7c7d' },
+    monitor: { label: '모니터', color: '#4a7fd9' },
+    bin: { label: '휴지통', color: '#868e96' },
+    lamp: { label: '스탠드', color: '#e0a800' },
+    whiteboard: { label: '화이트보드', color: '#adb5bd' },
+    rug: { label: '러그', color: '#b5651d' },
 };
+
+function furnitureChip(fData) {
+    return `<span class="furniture-chip"><i style="background:${fData.color}"></i>${escapeHtml(fData.label)}</span>`;
+}
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -128,10 +148,10 @@ function renderApiBadge() {
     const badge = document.getElementById('apiBadge');
     if (!badge) return;
     if (state.apiStatus?.openai_configured) {
-        badge.textContent = '🟢 OpenAI 연결됨';
+        badge.textContent = 'OpenAI 연결됨';
         badge.classList.add('connected');
     } else {
-        badge.textContent = '⚠️ OPENAI_API_KEY 미설정';
+        badge.textContent = 'OPENAI_API_KEY 미설정';
         badge.classList.add('disconnected');
     }
 }
@@ -197,10 +217,7 @@ function renderOffice() {
 
             const fData = FURNITURE_DISPLAY[state.placedItems[`${col},${row}`]];
             if (fData) {
-                const fEl = document.createElement('span');
-                fEl.className = 'furniture';
-                fEl.textContent = fData.emoji;
-                cell.appendChild(fEl);
+                cell.insertAdjacentHTML('beforeend', furnitureChip(fData));
             }
 
             grid.appendChild(cell);
@@ -238,6 +255,7 @@ function renderAgentsOnGrid(grid) {
 
         agentEl.addEventListener('click', () => showAgentInfo(agent));
         cell.appendChild(agentEl);
+        cell.classList.add('has-agent');
         cell.style.overflow = 'visible';
         cell.style.zIndex = '10';
     });
@@ -298,7 +316,7 @@ async function setOfficeView(mode) {
     grid.hidden = mode === '3d';
     state.officeView = mode;
     renderOffice();
-    document.getElementById('viewToggle').textContent = mode === '3d' ? '🗺️ 2D로 보기' : '🧊 3D로 보기';
+    document.getElementById('viewToggle').textContent = mode === '3d' ? '2D로 보기' : '3D로 보기';
     document.getElementById('resetView').hidden = mode !== '3d';
     document.getElementById('officeHint').textContent = mode === '3d'
         ? '드래그: 회전 · 휠/핀치: 확대 · 직원 클릭: 정보'
@@ -347,7 +365,7 @@ function showAgentInfo(agent) {
     body.innerHTML = `
         <div class="agent-detail">
             <div class="agent-detail-header">
-                <div class="agent-avatar-lg" style="background: ${agent.avatar_color}">
+                <div class="agent-avatar-lg" style="${avatarStyle(agent.avatar_color)}">
                     ${escapeHtml(agent.name.charAt(0))}
                 </div>
                 <div>
@@ -356,14 +374,14 @@ function showAgentInfo(agent) {
                 </div>
             </div>
             <div class="agent-status-label ${agent.status}">
-                ${STATUS_ICONS[agent.status]} ${STATUS_TEXT[agent.status]}
+                <i class="status-dot-inline ${agent.status}"></i>${STATUS_TEXT[agent.status]}
             </div>
             <div class="agent-detail-desc">${escapeHtml(agent.description)}</div>
             <div class="agent-detail-meta">
-                <div>🧠 모델 <code>${escapeHtml(agent.model)}</code></div>
+                <div>모델 <code>${escapeHtml(agent.model)}</code></div>
                 ${command
-                    ? `<div>⌨️ 호출 <code>/${escapeHtml(command)}</code></div>`
-                    : '<div>⌨️ 명령 없이 보낸 메시지를 자동으로 받습니다</div>'}
+                    ? `<div>호출 <code>/${escapeHtml(command)}</code></div>`
+                    : '<div>명령 없이 보낸 메시지를 자동으로 받습니다</div>'}
                 ${agent.example ? `<div class="agent-detail-example">예) ${escapeHtml(agent.example)}</div>` : ''}
             </div>
             <div>
@@ -372,7 +390,7 @@ function showAgentInfo(agent) {
                     ${agent.skills.map(s => `<span class="skill-tag">${escapeHtml(s)}</span>`).join('')}
                 </div>
             </div>
-            ${command ? `<button class="brain-btn assign-btn" data-command="/${escapeAttr(command)} ">📨 업무 지시하기</button>` : ''}
+            ${command ? `<button class="brain-btn assign-btn" data-command="/${escapeAttr(command)} ">업무 지시하기</button>` : ''}
         </div>
     `;
 
@@ -402,7 +420,7 @@ function renderAgentStatusBar() {
         const card = document.createElement('div');
         card.className = 'agent-card';
         card.innerHTML = `
-            <div class="agent-avatar-sm" style="background: ${agent.avatar_color}">
+            <div class="agent-avatar-sm" style="${avatarStyle(agent.avatar_color)}">
                 ${escapeHtml(agent.name.charAt(0))}
             </div>
             <div class="agent-card-info">
@@ -410,7 +428,7 @@ function renderAgentStatusBar() {
                 <div class="agent-card-role">${escapeHtml(agent.role)}</div>
                 <div class="agent-card-status">
                     <span class="status-dot ${agent.status === 'working' ? 'online' : ''}"></span>
-                    ${STATUS_ICONS[agent.status]} ${STATUS_TEXT[agent.status]}
+                    <i class="status-dot-inline ${agent.status}"></i>${STATUS_TEXT[agent.status]}
                 </div>
             </div>
         `;
@@ -440,7 +458,7 @@ function renderChatSidebar() {
         const item = document.createElement('div');
         item.className = 'chat-agent-item';
         item.innerHTML = `
-            <div class="chat-agent-avatar" style="background: ${agent.avatar_color}">
+            <div class="chat-agent-avatar" style="${avatarStyle(agent.avatar_color)}">
                 ${escapeHtml(agent.name.charAt(0))}
                 <span class="mini-dot" style="background: ${agent.status === 'working' ? 'var(--accent-green)' : 'var(--text-secondary)'}"></span>
             </div>
@@ -481,7 +499,7 @@ function buildMessageElement(msg) {
     // Avatar
     const avatar = document.createElement('div');
     avatar.className = 'chat-msg-avatar';
-    avatar.style.background = isUser ? '#ef4444' : (agent?.avatar_color || '#666');
+    avatar.style.cssText = avatarStyle(isUser ? '#5b4bc4' : agent?.avatar_color);
     avatar.textContent = isUser ? '나' : (agent?.name?.charAt(0) || '?');
 
     // Content wrapper
@@ -524,7 +542,7 @@ function buildMessageElement(msg) {
                 <img src="${escapeAttr(img.url)}" alt="${escapeAttr(img.prompt || 'Generated image')}" loading="lazy" class="chat-image">
                 <figcaption>
                     <span class="chat-image-prompt">${escapeHtml(img.prompt || '')}</span>
-                    <a href="${escapeAttr(img.url)}" target="_blank" rel="noopener" class="chat-image-download">원본 열기 ↗</a>
+                    <a href="${escapeAttr(img.url)}" target="_blank" rel="noopener" class="chat-image-download">원본 열기 ${icon('link', 12)}</a>
                 </figcaption>
             `;
             imgWrap.appendChild(fig);
@@ -536,7 +554,7 @@ function buildMessageElement(msg) {
     if (msg.citations && msg.citations.length > 0) {
         const citWrap = document.createElement('div');
         citWrap.className = 'citation-list';
-        citWrap.innerHTML = `<div class="citation-title">📚 출처</div>`;
+        citWrap.innerHTML = `<div class="citation-title">${icon('book', 14)} 출처</div>`;
         msg.citations.forEach(c => {
             const item = document.createElement('a');
             item.className = 'citation-item';
@@ -586,7 +604,7 @@ function enhanceCodeBlocks(container, codeBlocks) {
         header.className = 'code-block-header';
         header.innerHTML = `
             <span class="code-block-filename">
-                ${meta.filename ? '📄 ' + escapeHtml(meta.filename) : '💻 ' + (meta.language || 'code')}
+                ${meta.filename ? icon('file', 13) + ' ' + escapeHtml(meta.filename) : icon('code', 13) + ' ' + escapeHtml(meta.language || 'code')}
             </span>
             <div class="code-block-actions">
                 <span class="code-block-lang">${escapeHtml(meta.language || '')}</span>
@@ -606,7 +624,7 @@ function enhanceCodeBlocks(container, codeBlocks) {
             const idx = parseInt(btn.dataset.codeIdx, 10);
             const code = codeBlocks[idx]?.code || '';
             navigator.clipboard.writeText(code).then(() => {
-                btn.textContent = '복사됨 ✓';
+                btn.textContent = '복사됨';
                 setTimeout(() => { btn.textContent = '복사'; }, 1500);
             }).catch(() => {
                 btn.textContent = '실패';
@@ -642,7 +660,7 @@ function initChatInput() {
 
     const COMMAND_LIST = state.agents
         .filter(a => (a.commands || []).length)
-        .map(a => ({ id: a.commands[0], name: a.name, role: a.role, icon: AGENT_ICONS[a.id] || '👤' }));
+        .map(a => ({ id: a.commands[0], name: a.name, role: a.role, icon: agentBadge(a, 30) }));
 
     const showDropdown = (items, prefixChar) => {
         dropdown.innerHTML = items.map(m => `
@@ -700,7 +718,7 @@ function initChatInput() {
         setAgentActivity(guessed, 'working', guessed === 'dispatcher' ? '담당자 찾는 중…' : '작업 중…');
         const loadingMsg = {
             agent: guessed,
-            message: '_🤔 생각 중..._',
+            message: '_작업 중..._',
             time: new Date().toTimeString().slice(0, 5),
             type: 'system',
             _loading: true,
@@ -728,7 +746,7 @@ function initChatInput() {
             const agentName = state.agents.find(a => a.id === ai.agent)?.name || ai.agent;
             if (guessed !== ai.agent) setAgentActivity(guessed, 'idle');
             if (ai.metadata?.routed_by === 'classifier') {
-                setAgentActivity('dispatcher', 'idle', `→ ${agentName}에게 배정`);
+                setAgentActivity('dispatcher', 'idle', `${agentName}에게 배정`);
             }
             setAgentActivity(ai.agent, 'idle', bubbleSummary(ai.message));
             showToast(`${agentName} 응답 완료`);
@@ -740,7 +758,7 @@ function initChatInput() {
             setAgentActivity(guessed, 'idle', '전송 실패');
             state.chatMessages.push({
                 agent: 'dispatcher',
-                message: `⚠️ 메시지 전송 실패: ${err.message}`,
+                message: `메시지 전송 실패: ${err.message}`,
                 time: new Date().toTimeString().slice(0, 5),
                 type: 'system',
             });
@@ -855,12 +873,12 @@ function renderBrain() {
     stats.innerHTML = `
         <span>전체 <b>${state.entries.length}</b>건</span>
         <span>회의록 <b>${meetings}</b>건</span>
-        <span>🏆 성과 후보 <b>${achievements}</b>건</span>
+        <span>성과 후보 <b>${achievements}</b>건</span>
         <span>표시 중 <b>${filtered.length}</b>건</span>
         ${state.brainMeta.stale_embeddings > 0 ? `
             <button class="brain-btn warn" id="reembedBtn"
                     title="임베딩이 없거나 다른 임베딩 모델로 만든 기록입니다. 갱신 전까지는 키워드로만 검색됩니다.">
-                ⚠️ 검색 인덱스 갱신 필요 ${state.brainMeta.stale_embeddings}건 · 갱신
+                ${icon('alert', 14)} 검색 인덱스 갱신 필요 ${state.brainMeta.stale_embeddings}건 · 갱신
             </button>` : ''}
         <span class="brain-models" title="에이전트별 모델 (.env에서 변경)">
             모델: 기록 ${escapeHtml(models.archivist || '')} · 검색 ${escapeHtml(models.finder || '')} · 보고 ${escapeHtml(models.reporter || '')} · 성과 ${escapeHtml(models.coach || '')} · 임베딩 ${escapeHtml(models.embedding || '')}
@@ -886,14 +904,14 @@ function renderBrain() {
         return `${dateHeader}
             <article class="entry-card ${e.kind}">
                 <div class="entry-head">
-                    <span class="entry-kind">${e.kind === 'meeting' ? '📝 회의' : '🗂️ 기록'}</span>
+                    <span class="entry-kind ${e.kind}">${e.kind === 'meeting' ? '회의록' : '기록'}</span>
                     <span class="entry-category">${escapeHtml(e.category)}</span>
-                    <span class="entry-title">${escapeHtml(e.title)}${d.achievement ? ' 🏆' : ''}</span>
+                    <span class="entry-title">${escapeHtml(e.title)}${d.achievement ? ' <span class="achievement-tag">성과</span>' : ''}</span>
                     <span class="entry-id">#${e.id}</span>
-                    <button class="entry-delete" data-id="${e.id}" title="삭제">✕</button>
+                    <button class="entry-delete" data-id="${e.id}" title="삭제" aria-label="삭제">${icon('close', 14)}</button>
                 </div>
                 ${e.summary ? `<div class="entry-summary">${escapeHtml(e.summary)}</div>` : ''}
-                ${d.impact ? `<div class="entry-impact">📈 ${escapeHtml(d.impact)}</div>` : ''}
+                ${d.impact ? `<div class="entry-impact">${icon('trend', 14)} ${escapeHtml(d.impact)}</div>` : ''}
                 ${decisions ? `<div class="entry-section"><b>결정사항</b><ul>${decisions}</ul></div>` : ''}
                 ${actions ? `<div class="entry-section"><b>액션 아이템</b><ul>${actions}</ul></div>` : ''}
                 ${(e.tags || []).length ? `<div class="entry-tags">${e.tags.map(t => `<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
@@ -1052,11 +1070,11 @@ function renderCalendarSide(byDate, today) {
             <div class="cal-item ${ev.kind}">
                 <div class="cal-item-time">${escapeHtml(eventTime(ev))}</div>
                 <div class="cal-item-body">
-                    <div class="cal-item-title">${ev.kind === 'deadline' ? '⏰ ' : ''}${escapeHtml(ev.title)}</div>
-                    ${ev.location ? `<div class="cal-item-loc">📍 ${escapeHtml(ev.location)}</div>` : ''}
+                    <div class="cal-item-title">${escapeHtml(ev.title)}</div>
+                    ${ev.location ? `<div class="cal-item-loc">${icon('pin', 12)} ${escapeHtml(ev.location)}</div>` : ''}
                 </div>
-                <a class="cal-ics" href="/api/events/${ev.id}.ics" download title="이 일정만 .ics로 받기">📥</a>
-                <button class="cal-delete entry-delete" data-id="${ev.id}" title="삭제">✕</button>
+                <a class="cal-ics" href="/api/events/${ev.id}.ics" download title="이 일정만 .ics로 받기" aria-label="이 일정 .ics 받기">${icon('download', 15)}</a>
+                <button class="cal-delete entry-delete" data-id="${ev.id}" title="삭제" aria-label="삭제">${icon('close', 14)}</button>
             </div>`;
     }).join('');
 }
@@ -1139,10 +1157,10 @@ function renderFurnitureItems(category) {
     const items = state.furniture.filter(f => category === '전체' || f.category === category);
 
     container.innerHTML = items.map(item => {
-        const display = FURNITURE_DISPLAY[item.icon] || { emoji: '📦', label: item.name };
+        const display = FURNITURE_DISPLAY[item.icon] || { color: '#adb5bd', label: item.name };
         return `
             <div class="furniture-item ${state.selectedFurniture === item.id ? 'selected' : ''}" data-id="${item.id}">
-                <div class="furniture-icon">${display.emoji}</div>
+                <div class="furniture-icon"><i style="background:${display.color}"></i></div>
                 <div class="furniture-name">${item.name}</div>
             </div>
         `;
@@ -1176,7 +1194,7 @@ function renderCustomizeGrid() {
 
             const fData = FURNITURE_DISPLAY[hasItem];
             if (fData) {
-                cell.innerHTML = `<span class="placed-item">${fData.emoji}</span>`;
+                cell.innerHTML = furnitureChip(fData);
             }
 
             cell.addEventListener('click', () => {

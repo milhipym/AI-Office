@@ -94,16 +94,16 @@ def describe(ev: dict) -> str:
     when = f"{d.month}/{d.day}({WEEKDAYS[d.weekday()]})"
     if ev["start_time"]:
         when += f" {ev['start_time']}" + (f"~{ev['end_time']}" if ev["end_time"] else "")
-    icon = "⏰" if ev["kind"] == "deadline" else "📅"
+    tag = "[마감] " if ev["kind"] == "deadline" else ""
     place = f" · {ev['location']}" if ev["location"] else ""
-    return f"{icon} {when} **{ev['title']}**{place}"
+    return f"{tag}{when} **{ev['title']}**{place}"
 
 
 def calendar_note(saved: list) -> str:
     """Line appended to a record/minutes reply when events were filed."""
     if not saved:
         return ""
-    lines = ["", f"📅 **일정표에 {len(saved)}건 추가했습니다** (잘못 들어갔으면 일정표 탭에서 삭제)"]
+    lines = ["", f"**일정표에 {len(saved)}건 추가했습니다** (잘못 들어갔으면 일정표 탭에서 삭제)"]
     lines += [f"- {describe(ev)}" for ev in saved]
     return "\n".join(lines)
 
@@ -144,13 +144,13 @@ class SchedulerAgent(BaseAgent):
         events = normalize_events(data.get("events"), now)
         if not events:
             return AgentResponse(
-                text=("📅 등록할 일정을 찾지 못했습니다. 오늘 이후의 **구체적인 날짜**가 필요합니다.\n\n"
+                text=("등록할 일정을 찾지 못했습니다. 오늘 이후의 **구체적인 날짜**가 필요합니다.\n\n"
                       "예: `/일정 다음주 화요일 15시 보안 점검 회의 본사 3층`"),
                 metadata=meta,
             )
         saved = save_events(events)
         skipped = len(events) - len(saved)
-        lines = [f"📅 **일정 {len(saved)}건을 등록했습니다.**"] + [f"- {describe(ev)}" for ev in saved]
+        lines = [f"**일정 {len(saved)}건을 등록했습니다.**"] + [f"- {describe(ev)}" for ev in saved]
         if skipped:
             lines.append(f"\n_이미 같은 날 같은 제목의 일정이 있어 {skipped}건은 건너뛰었습니다._")
         return AgentResponse(text="\n".join(lines), metadata={**meta, "calendar_refresh": True})
@@ -159,13 +159,13 @@ class SchedulerAgent(BaseAgent):
         events = brain_store.list_events(start.isoformat(), end.isoformat())
         meta = meta or {"agent": self.id}
         if not events:
-            text = f"📭 {label}({start} ~ {end}) 일정이 없습니다."
+            text = f"{label}({start} ~ {end}) 일정이 없습니다."
             # e.g. "이번주" asked on a Sunday: point at what's coming instead.
             now = today()
             upcoming = brain_store.list_events(now.isoformat(), (now + timedelta(days=UPCOMING_DAYS - 1)).isoformat())
             if upcoming:
                 text += f"\n\n**다가오는 일정 ({UPCOMING_DAYS}일)**\n" + "\n".join(f"- {describe(ev)}" for ev in upcoming)
             return AgentResponse(text=text, metadata=meta)
-        lines = [f"📅 **{label} 일정** ({start} ~ {end}, {len(events)}건)"]
+        lines = [f"**{label} 일정** ({start} ~ {end}, {len(events)}건)"]
         lines += [f"- {describe(ev)}" for ev in events]
         return AgentResponse(text="\n".join(lines), metadata=meta)

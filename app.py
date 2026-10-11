@@ -16,11 +16,12 @@ from agents.brain_agents import reembed_stale
 from agents.router import dispatch, is_smalltalk
 from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
 from services import brain_store, ics, storage
+from services.text import strip_emoji
 from services.openai_client import OpenAIError
 
 # Canned smalltalk replies — avoid burning tokens on "안녕"
 SMALLTALK_REPLIES = [
-    "안녕하세요! 👋 오늘 한 일은 `/기록`, 회의 메모는 `/회의`로 남겨 주세요.",
+    "안녕하세요. 오늘 한 일은 `/기록`, 회의 메모는 `/회의`로 남겨 주세요.",
     "반갑습니다! 지난 기록이 궁금하면 `/찾기`, 주간 보고는 `/주간`입니다.",
     "네, 듣고 있습니다. 명령 없이 보내셔도 접수 매니저가 담당자에게 배정합니다.",
     "안녕하세요, 대표님. 기록팀과 자료·보고팀이 대기 중입니다.",
@@ -112,7 +113,8 @@ def send_message():
 
     ai_msg_record = {
         "agent": agent.id,
-        "message": response.text,
+        # The UI is emoji-free; models add them anyway now and then.
+        "message": strip_emoji(response.text),
         "time": datetime.now().strftime("%H:%M"),
         "type": "code" if response.format == "code" else "report",
         "code_blocks": [cb.__dict__ for cb in response.code_blocks],
@@ -261,7 +263,7 @@ def get_status():
 if __name__ == "__main__":
     if not is_openai_configured():
         print("=" * 60)
-        print("⚠️  OPENAI_API_KEY is not set.")
+        print("[!] OPENAI_API_KEY is not set.")
         print("   Copy .env.example to .env and add your key.")
         print("   The app will still run, but agents will return placeholders.")
         print("=" * 60)

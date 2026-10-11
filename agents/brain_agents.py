@@ -132,15 +132,15 @@ class ArchivistAgent(BrainAgent):
                 embedding_model=EMBEDDING_MODEL,
             ))
 
-        lines = [f"📥 **{len(saved)}건 기록했습니다.**", "", "| 날짜 | 분류 | 제목 | 태그 |", "|---|---|---|---|"]
+        lines = [f"**{len(saved)}건 기록했습니다.**", "", "| 날짜 | 분류 | 제목 | 태그 |", "|---|---|---|---|"]
         for e in saved:
-            star = " 🏆" if e["details"].get("achievement") else ""
+            star = " (성과)" if e["details"].get("achievement") else ""
             lines.append(
                 f"| {e['entry_date']} | {e['category']} | {e['title']}{star} | "
                 f"{' '.join('#' + t for t in e['tags'])} |"
             )
         if any(e["details"].get("achievement") and not e["details"].get("impact") for e in saved):
-            lines += ["", "💡 성과로 보이는 기록입니다. 수치(시간 단축, 건수, 비율 등)를 덧붙이면 나중에 성과 정리에 그대로 쓰입니다."]
+            lines += ["", "성과로 보이는 기록입니다. 수치(시간 단축, 건수, 비율 등)를 덧붙이면 나중에 성과 정리에 그대로 쓰입니다."]
 
         events = save_events(
             normalize_events(result["data"].get("events"), now),
@@ -226,18 +226,18 @@ def _optional_date(value) -> str:
 
 def render_minutes(entry: dict) -> str:
     d = entry["details"]
-    out = [f"## 📝 {entry['title']}", f"**일자:** {entry['entry_date']}"]
+    out = [f"## {entry['title']}", f"**일자:** {entry['entry_date']}"]
     if d.get("attendees"):
         out.append(f"**참석:** {', '.join(d['attendees'])}")
     if entry["summary"]:
         out += ["", entry["summary"]]
     if d.get("decisions"):
-        out += ["", "### ✅ 결정사항"] + [f"- {x}" for x in d["decisions"]]
+        out += ["", "### 결정사항"] + [f"- {x}" for x in d["decisions"]]
     if d.get("action_items"):
-        out += ["", "### 📌 액션 아이템", "| 할 일 | 담당 | 기한 |", "|---|---|---|"]
+        out += ["", "### 액션 아이템", "| 할 일 | 담당 | 기한 |", "|---|---|---|"]
         out += [f"| {i['task']} | {i['owner'] or '미정'} | {i['due'] or '-'} |" for i in d["action_items"]]
     if d.get("open_issues"):
-        out += ["", "### ❓ 미결 사항"] + [f"- {x}" for x in d["open_issues"]]
+        out += ["", "### 미결 사항"] + [f"- {x}" for x in d["open_issues"]]
     out += ["", f"_회의록 #{entry['id']}로 저장했습니다._"]
     return "\n".join(out)
 
@@ -311,7 +311,7 @@ class FinderAgent(BrainAgent):
         candidates = brain_store.list_entries(date_from=date_from, date_to=date_to, with_embedding=True)
         if not candidates:
             return AgentResponse(
-                text=f"🔎 {label}에 저장된 기록이 없습니다.",
+                text=f"{label}에 저장된 기록이 없습니다.",
                 metadata={"agent": self.id, "period": label},
             )
 
@@ -323,7 +323,7 @@ class FinderAgent(BrainAgent):
             hits = rank_entries(message, candidates, query_vec)
         if not hits:
             return AgentResponse(
-                text=f"🔎 {label} 기록 {len(candidates)}건 중 관련된 내용을 찾지 못했습니다.",
+                text=f"{label} 기록 {len(candidates)}건 중 관련된 내용을 찾지 못했습니다.",
                 metadata={"agent": self.id, "period": label},
             )
 
@@ -393,7 +393,7 @@ class ReporterAgent(BrainAgent):
         label = f"{start.isoformat()} ~ {end.isoformat()}"
         if not entries:
             return AgentResponse(
-                text=f"📭 {label} 기간에 기록이 없어 주간 보고를 만들 수 없습니다.\n\n`/기록 ...`으로 그날그날 한 일을 남겨 주세요.",
+                text=f"{label} 기간에 기록이 없어 주간 보고를 만들 수 없습니다.\n\n`/기록 ...`으로 그날그날 한 일을 남겨 주세요.",
                 metadata={"agent": self.id, "period": label},
             )
         next_start, next_end = end + timedelta(days=1), end + timedelta(days=7)
@@ -408,7 +408,7 @@ class ReporterAgent(BrainAgent):
             f"[보고 기간] {label}\n[추가 요청] {message or '없음'}\n"
             f"[다음 7일 일정표 ({next_start} ~ {next_end})]\n{calendar}",
         )
-        resp.text = f"# 📊 주간 업무 보고 ({label})\n\n{resp.text}"
+        resp.text = f"# 주간 업무 보고 ({label})\n\n{resp.text}"
         resp.metadata["period"] = label
         return resp
 
@@ -436,12 +436,12 @@ class CoachAgent(BrainAgent):
         if len(entries) < self.MIN_ENTRIES:
             return AgentResponse(
                 text=(
-                    f"📭 {label} ({date_from} ~ {date_to}) 기록이 {len(entries)}건뿐이라 성과 정리를 하기엔 근거가 부족합니다.\n\n"
+                    f"{label} ({date_from} ~ {date_to}) 기록이 {len(entries)}건뿐이라 성과 정리를 하기엔 근거가 부족합니다.\n\n"
                     f"최소 {self.MIN_ENTRIES}건 이상 쌓인 뒤 다시 요청해 주세요. 수치가 들어간 기록일수록 결과가 좋아집니다."
                 ),
                 metadata={"agent": self.id, "period": label},
             )
         resp = _summarize(self, COACH_PROMPT, entries, f"[정리 기간] {label} ({date_from} ~ {date_to})\n[추가 요청] {message or '없음'}")
-        resp.text = f"# 🧭 성과 · 커리어 정리 ({label})\n\n{resp.text}"
+        resp.text = f"# 성과 · 커리어 정리 ({label})\n\n{resp.text}"
         resp.metadata["period"] = label
         return resp
