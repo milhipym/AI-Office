@@ -90,6 +90,15 @@
                     </div>
                 </div>
             </div>
+            <form class="office-command" id="officeCommand">
+                <label for="officeInput" class="sr-only">업무 지시</label>
+                <input id="officeInput" class="office-input" data-send-control autocomplete="off"
+                       placeholder="오늘 한 일을 적거나 /기록 · /회의 · /일정 으로 시작하세요">
+                <button type="submit" class="send-btn" data-send-control aria-label="보내기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                </button>
+            </form>
+            <p class="office-command-hint">결과는 직원 말풍선과 팀 채팅에 남습니다.</p>
             <!-- Agent Status Bar -->
             <div class="agent-status-bar" id="agentStatusBar">
                 <!-- Agent status cards -->
@@ -115,8 +124,8 @@
                     </div>
                     <div class="chat-input-area">
                         <div class="chat-input-wrapper">
-                            <textarea id="chatInput" placeholder="/기록 오늘 결제 모듈 타임아웃 원인 찾아서 배포함 (Shift+Enter 줄바꿈)" class="chat-input" rows="2"></textarea>
-                            <button id="sendBtn" class="send-btn">
+                            <textarea id="chatInput" data-send-control placeholder="/기록 오늘 결제 모듈 타임아웃 원인 찾아서 배포함 (Shift+Enter 줄바꿈)" class="chat-input" rows="2"></textarea>
+                            <button id="sendBtn" class="send-btn" data-send-control aria-label="보내기">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
                             </button>
                         </div>

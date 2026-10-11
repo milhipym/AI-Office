@@ -173,7 +173,6 @@ body {
 
 .tab-content.active {
     display: block;
-    animation: fadeIn 0.3s ease;
 }
 
 @keyframes fadeIn {
@@ -804,7 +803,6 @@ body {
 .chat-message {
     display: flex;
     gap: 12px;
-    animation: slideIn 0.3s ease;
 }
 
 @keyframes slideIn {
@@ -2575,4 +2573,121 @@ textarea.chat-input {
 
 .agent-status-bar {
     flex-wrap: wrap;
+}
+
+/* ===== OFFICE COMMAND BAR ===== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.office-command {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.office-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 14px;
+}
+
+.office-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.office-command .send-btn {
+    min-width: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.office-command-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+[data-send-control]:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* ===== MOTION =====
+   Short, purposeful entrances. Everything here is skipped when the OS asks
+   for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+    .tab-content.active {
+        animation: tab-in 0.28s ease-out;
+    }
+
+    .chat-message.enter {
+        animation: msg-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    /* 3D labels are rebuilt only when the bubble text changes, so this pops
+       once per result. (2D and list views redraw often: no entrance there.) */
+    .office3d-bubble {
+        animation: bubble-pop 0.42s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+        transform-origin: 50% 100%;
+    }
+
+    .office3d-name i,
+    .status-dot-inline.working {
+        transition: background-color 0.3s;
+    }
+
+    .agent-card,
+    .brain-btn,
+    .send-btn,
+    .nav-tab {
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+
+    .agent-card:hover,
+    .brain-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .toast {
+        transition: transform 0.35s cubic-bezier(0.2, 1.3, 0.4, 1);
+    }
+}
+
+@keyframes tab-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes msg-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes bubble-pop {
+    0% { opacity: 0; transform: scale(0.6) translateY(6px); }
+    100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pixel-agent,
+    .pixel-agent .agent-body,
+    .status-dot.online {
+        animation: none !important;
+    }
 }

@@ -178,6 +178,9 @@ class Office3D {
         this.container = container;
         this.ctx = ctx;  // { getState, onAgentClick, escapeHtml }
         this.agents = new Map();  // id -> { group, parts, label, seed }
+        this.effects = [];        // running motion effects: { update(dt) -> alive }
+        this.spots = [];          // furniture positions, for "file it on the shelf" motion
+        this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
         this.furnitureKey = '';
 
         this.scene = new THREE.Scene();
@@ -216,7 +219,10 @@ class Office3D {
 
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
-        this.renderer.domElement.addEventListener('pointerdown', e => { this.downAt = [e.clientX, e.clientY]; });
+        this.renderer.domElement.addEventListener('pointerdown', e => {
+            this.downAt = [e.clientX, e.clientY];
+            this.intro = null;  // the user takes the camera: stop the fly-in
+        });
         this.renderer.domElement.addEventListener('pointerup', e => this.handleClick(e));
         this.renderer.domElement.addEventListener('pointermove', e => this.handleHover(e));
 
@@ -228,6 +234,7 @@ class Office3D {
         this.resetView();
         this.resize();
 
+        this.startIntro();
         this.clock = new THREE.Clock();
         this.renderer.setAnimationLoop(() => this.frame());
     }
@@ -326,6 +333,7 @@ class Office3D {
             o.material?.dispose();
         });
         this.furniture.clear();
+        this.spots = [];
         const seats = new Set(agents.map(a => `${a.position?.x},${a.position?.y}`));
         for (const [cell, type] of Object.entries(placedItems)) {
             const make = FURNITURE[type];
@@ -333,7 +341,9 @@ class Office3D {
             const [c, r] = cell.split(',').map(Number);
             const [x, z] = this.cellCenter(c, r);
             // Someone sits here: push the furniture in front of them.
-            this.furniture.add(at(make(), x, 0, seats.has(cell) ? z + 0.28 : z));
+            const fz = seats.has(cell) ? z + 0.28 : z;
+            this.furniture.add(at(make(), x, 0, fz));
+            this.spots.push({ type, x, z: fz });
         }
     }
 
@@ -369,7 +379,7 @@ class Office3D {
                 const [x, z] = this.cellCenter(agent.position.x, agent.position.y);
                 model.group.position.set(x, 0, z - 0.12);
                 this.scene.add(model.group);
-                entry = { ...model, label, seed: Math.random() * 10, key: '' };
+                entry = { ...model, label, seed: Math.random() * 10, key: '', color: agent.avatar_color };
                 this.agents.set(agent.id, entry);
             }
             const bubble = state.activity[agent.id] || '';
@@ -385,7 +395,9 @@ class Office3D {
     frame() {
         // Don't spend GPU time while the office tab is hidden.
         if (!this.container.offsetParent) return;
-        const t = this.clock.getElapsedTime();
+        // Clamp: the first frame after the tab was hidden would jump.
+        const dt = Math.min(this.clock.getDelta(), 0.05);
+        const t = this.clock.elapsedTime;
         for (const entry of this.agents.values()) {
             const p = entry.parts;
             const s = t + entry.seed;
@@ -399,10 +411,224 @@ class Office3D {
                 p.armL.rotation.x = p.armR.rotation.x = 0;
                 p.head.rotation.y = Math.sin(s * 0.7) * 0.35;
             }
+            this.animateRing(entry, t);
         }
+        this.stepEffects(dt);
+        if (this.intro) this.stepIntro(dt);
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
         this.labels.render(this.scene, this.camera);
+    }
+
+    // Effects may start new effects while updating (a hand-over landing
+    // starts the burst): collect those separately so none is dropped.
+    stepEffects(dt) {
+        const running = this.effects;
+        this.effects = [];
+        const alive = running.filter(effect => effect.update(dt));
+        this.effects = alive.concat(this.effects);
+    }
+
+    // ===== Motion =====
+    // Every motion stands for something that actually happened: a task handed
+    // over, work in progress, a result, a record filed, an event scheduled.
+
+    get animating() {
+        return !this.reducedMotion && !!this.container.offsetParent;
+    }
+
+    startIntro() {
+        if (this.reducedMotion) return;
+        this.intro = {
+            t: 0,
+            duration: 1.6,
+            from: new THREE.Vector3(17, 18, 21),
+            to: this.camera.position.clone(),
+            zoomFrom: 0.7,
+        };
+        this.camera.position.copy(this.intro.from);
+        this.camera.zoom = this.intro.zoomFrom;
+        this.camera.updateProjectionMatrix();
+    }
+
+    stepIntro(dt) {
+        const it = this.intro;
+        it.t = Math.min(it.t + dt / it.duration, 1);
+        const e = 1 - Math.pow(1 - it.t, 3);  // ease-out cubic
+        this.camera.position.lerpVectors(it.from, it.to, e);
+        this.camera.zoom = it.zoomFrom + (1 - it.zoomFrom) * e;
+        this.camera.updateProjectionMatrix();
+        if (it.t >= 1) this.intro = null;
+    }
+
+    agentColor(id) {
+        return this.ctx.getState().agents.find(a => a.id === id)?.avatar_color || '#94a3b8';
+    }
+
+    anchor(id) {
+        const g = this.agents.get(id)?.group;
+        return g ? new THREE.Vector3(g.position.x, 0.75, g.position.z) : null;
+    }
+
+    later(seconds, fn) {
+        let left = seconds;
+        this.effects.push({ update: dt => ((left -= dt) > 0 ? true : (fn(), false)) });
+    }
+
+    // Working: a ring in the staff color spreads from under their feet.
+    animateRing(entry, t) {
+        if (entry.status !== 'working' || this.reducedMotion) {
+            if (entry.ring) entry.ring.visible = false;
+            return;
+        }
+        if (!entry.ring) {
+            entry.ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.2, 0.26, 40),
+                new THREE.MeshBasicMaterial({ color: entry.color, transparent: true, depthWrite: false }),
+            );
+            entry.ring.rotation.x = -Math.PI / 2;
+            this.scene.add(entry.ring);
+        }
+        const phase = (t * 0.9 + entry.seed) % 1;
+        entry.ring.visible = true;
+        entry.ring.position.set(entry.group.position.x, 0.015, entry.group.position.z);
+        entry.ring.scale.setScalar(1 + phase * 1.8);
+        entry.ring.material.opacity = 0.75 * (1 - phase);
+    }
+
+    // A sheet of paper flies along an arc, after `delay` seconds.
+    // Returns the flight time in seconds (excluding the delay).
+    flyPaper(from, to, color, { card = false, delay = 0 } = {}) {
+        if (!from || !to) return 0;
+        const sheet = new THREE.Group();
+        // Big enough to read at the default camera distance.
+        const w = card ? 0.38 : 0.34;
+        const d = card ? 0.28 : 0.44;
+        const body = box(w, 0.03, d, card ? 0xfff1c9 : 0xffffff);
+        const band = box(w, 0.04, 0.09, new THREE.Color(color).getHex());
+        band.position.z = -(d / 2 - 0.045);
+        sheet.add(body, band);
+        sheet.position.copy(from);
+        sheet.visible = delay <= 0;
+        this.scene.add(sheet);
+
+        const dist = from.distanceTo(to);
+        const duration = 0.75 + dist * 0.06;
+        const control = from.clone().lerp(to, 0.5);
+        control.y += 1.1 + dist * 0.12;
+        let t = 0;
+        let wait = delay;
+        this.effects.push({
+            update: dt => {
+                if (wait > 0) {
+                    wait -= dt;
+                    return true;
+                }
+                sheet.visible = true;
+                t = Math.min(t + dt / duration, 1);
+                const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;  // ease-in-out
+                const a = from.clone().multiplyScalar((1 - e) * (1 - e));
+                const b = control.clone().multiplyScalar(2 * (1 - e) * e);
+                const c = to.clone().multiplyScalar(e * e);
+                sheet.position.copy(a.add(b).add(c));
+                sheet.rotation.y = e * Math.PI * 2;
+                sheet.rotation.z = Math.sin(e * Math.PI) * 0.5;
+                sheet.scale.setScalar(t > 0.85 ? 1 - (t - 0.85) / 0.15 * 0.8 : 1);
+                if (t < 1) return true;
+                this.scene.remove(sheet);
+                sheet.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
+                return false;
+            },
+        });
+        return duration;
+    }
+
+    // Done: a small burst of cubes in the staff color.
+    burst(id) {
+        const origin = this.anchor(id);
+        if (!origin) return;
+        // From the waist and mostly sideways: the name tag and bubble (DOM,
+        // drawn on top) cover the space above the head.
+        origin.y = 0.5;
+        const colors = [new THREE.Color(this.agentColor(id)).getHex(), 0xffffff, 0xffd166];
+        const count = 18;
+        for (let i = 0; i < count; i++) {
+            const size = 0.07 + (i % 3) * 0.02;
+            const cube = box(size, size, size, colors[i % colors.length], { transparent: true });
+            cube.castShadow = false;
+            cube.position.copy(origin);
+            this.scene.add(cube);
+            const angle = (i / count) * Math.PI * 2;
+            const spread = 1.1 + Math.random() * 0.7;
+            const v = new THREE.Vector3(Math.cos(angle) * spread, 1.3 + Math.random() * 0.6, Math.sin(angle) * spread);
+            let life = 0;
+            this.effects.push({
+                update: dt => {
+                    life += dt;
+                    v.y -= 6 * dt;
+                    cube.position.addScaledVector(v, dt);
+                    cube.rotation.x += dt * 6;
+                    cube.rotation.y += dt * 5;
+                    cube.material.opacity = Math.max(0, 1 - Math.max(0, life - 0.5) / 0.5);
+                    if (life < 1) return true;
+                    this.scene.remove(cube);
+                    cube.geometry.dispose();
+                    cube.material.dispose();
+                    return false;
+                },
+            });
+        }
+    }
+
+    nearestSpot(type, from) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const spot of this.spots) {
+            if (spot.type !== type) continue;
+            const d = Math.hypot(spot.x - from.x, spot.z - from.z);
+            if (d < bestDist) {
+                best = spot;
+                bestDist = d;
+            }
+        }
+        return best;
+    }
+
+    // A message was sent: the task flies in from outside to whoever takes it.
+    onSend(agentId) {
+        if (!this.animating) return;
+        const { rows } = this.ctx.getState().office.grid;
+        const duration = this.flyPaper(new THREE.Vector3(0, 3.4, rows / 2 + 1.5), this.anchor(agentId), this.agentColor(agentId));
+        // A fast reply must not overtake the task that is still flying in.
+        this.inFlightUntil = this.clock.elapsedTime + duration;
+    }
+
+    // A reply arrived. Resolves when the hand-over has landed, so the speech
+    // bubble pops then (frame-driven, so it stays in step on slow machines).
+    onResponse({ agent, routedBy, filed, scheduled }) {
+        if (!this.animating) return Promise.resolve();
+        let landed;
+        const done = new Promise(resolve => { landed = resolve; });
+        let delay = Math.max(0, (this.inFlightUntil || 0) - this.clock.elapsedTime);
+        if (routedBy === 'classifier' && agent !== 'dispatcher') {
+            delay += this.flyPaper(this.anchor('dispatcher'), this.anchor(agent), this.agentColor(agent), { delay });
+        }
+        this.later(delay, () => {
+            landed();
+            this.burst(agent);
+            const from = this.anchor(agent);
+            if (filed && from) {
+                const shelf = this.nearestSpot('bookshelf', from);
+                if (shelf) this.flyPaper(from, new THREE.Vector3(shelf.x, 0.9, shelf.z - 0.25), this.agentColor(agent));
+            }
+            if (scheduled && from) {
+                const to = agent === 'scheduler'
+                    ? (s => s && new THREE.Vector3(s.x, 0.9, s.z - 0.3))(this.nearestSpot('whiteboard', from))
+                    : this.anchor('scheduler');
+                if (to) this.flyPaper(from, to, '#e5b93a', { card: true });
+            }
+        });
+        return done;
     }
 
     resize() {
@@ -420,6 +646,7 @@ class Office3D {
     }
 
     resetView() {
+        this.intro = null;
         this.camera.position.set(9, 10, 11);
         this.camera.zoom = 1;
         this.camera.updateProjectionMatrix();

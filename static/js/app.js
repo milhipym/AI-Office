@@ -133,6 +133,7 @@ async function loadData() {
         renderOrgChart();
         renderCustomize();
         initChatInput();
+        initOfficeCommand();
         initOfficeView();
         initBrain();
         loadEntries();
@@ -471,12 +472,20 @@ function renderChatSidebar() {
     });
 }
 
+const renderedMessages = new WeakSet();
+
 function renderChatMessages() {
     const container = document.getElementById('chatMessages');
     container.innerHTML = '';
 
     state.chatMessages.forEach(msg => {
-        container.appendChild(buildMessageElement(msg));
+        const el = buildMessageElement(msg);
+        // Only messages not drawn before get the entrance motion.
+        if (!renderedMessages.has(msg)) {
+            el.classList.add('enter');
+            renderedMessages.add(msg);
+        }
+        container.appendChild(el);
     });
 
     // Apply syntax highlighting after DOM insertion
@@ -697,78 +706,11 @@ function initChatInput() {
 
     const send = async () => {
         const message = input.value.trim();
-        if (!message) return;
-
+        if (!message || state.sending) return;
         input.value = '';
         dropdown.classList.remove('open');
-        input.disabled = true;
-        sendBtn.disabled = true;
-
-        // Optimistic user message
-        const tempUser = {
-            agent: 'user',
-            message,
-            time: new Date().toTimeString().slice(0, 5),
-            type: 'command',
-        };
-        state.chatMessages.push(tempUser);
-
-        // Loading placeholder
-        const guessed = guessAgent(message);
-        setAgentActivity(guessed, 'working', guessed === 'dispatcher' ? '담당자 찾는 중…' : '작업 중…');
-        const loadingMsg = {
-            agent: guessed,
-            message: '_작업 중..._',
-            time: new Date().toTimeString().slice(0, 5),
-            type: 'system',
-            _loading: true,
-        };
-        state.chatMessages.push(loadingMsg);
-        renderChatMessages();
-
-        try {
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message }),
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-
-            // Replace optimistic + loading with real messages
-            state.chatMessages = state.chatMessages.filter(m => !m._loading);
-            // Replace last user msg (in case server normalized)
-            state.chatMessages[state.chatMessages.length - 1] = data.user_message;
-            state.chatMessages.push(data.ai_response);
-            renderChatMessages();
-
-            const ai = data.ai_response;
-            const agentName = state.agents.find(a => a.id === ai.agent)?.name || ai.agent;
-            if (guessed !== ai.agent) setAgentActivity(guessed, 'idle');
-            if (ai.metadata?.routed_by === 'classifier') {
-                setAgentActivity('dispatcher', 'idle', `${agentName}에게 배정`);
-            }
-            setAgentActivity(ai.agent, 'idle', bubbleSummary(ai.message));
-            showToast(`${agentName} 응답 완료`);
-            if (ai.metadata?.brain_refresh) loadEntries();
-            if (ai.metadata?.calendar_refresh) loadEvents();
-        } catch (err) {
-            console.error('Send failed:', err);
-            state.chatMessages = state.chatMessages.filter(m => !m._loading);
-            setAgentActivity(guessed, 'idle', '전송 실패');
-            state.chatMessages.push({
-                agent: 'dispatcher',
-                message: `메시지 전송 실패: ${err.message}`,
-                time: new Date().toTimeString().slice(0, 5),
-                type: 'system',
-            });
-            renderChatMessages();
-            showToast('전송 실패');
-        } finally {
-            input.disabled = false;
-            sendBtn.disabled = false;
-            input.focus();
-        }
+        await sendMessage(message);
+        input.focus();
     };
 
     sendBtn.addEventListener('click', send);
@@ -779,6 +721,99 @@ function initChatInput() {
         }
     });
     input.addEventListener('input', updateCommandDropdown);
+}
+
+// ===== SENDING (shared by the chat tab and the office command bar) =====
+function setSending(on) {
+    state.sending = on;
+    document.querySelectorAll('[data-send-control]').forEach(el => { el.disabled = on; });
+}
+
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function sendMessage(message) {
+    setSending(true);
+    state.chatMessages.push({
+        agent: 'user',
+        message,
+        time: new Date().toTimeString().slice(0, 5),
+        type: 'command',
+    });
+
+    const guessed = guessAgent(message);
+    setAgentActivity(guessed, 'working', guessed === 'dispatcher' ? '담당자 찾는 중…' : '작업 중…');
+    state.office3d?.onSend(guessed);
+    state.chatMessages.push({
+        agent: guessed,
+        message: '_작업 중..._',
+        time: new Date().toTimeString().slice(0, 5),
+        type: 'system',
+        _loading: true,
+    });
+    renderChatMessages();
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        state.chatMessages = state.chatMessages.filter(m => !m._loading);
+        state.chatMessages[state.chatMessages.length - 1] = data.user_message;
+        state.chatMessages.push(data.ai_response);
+        renderChatMessages();
+
+        const ai = data.ai_response;
+        const agentName = state.agents.find(a => a.id === ai.agent)?.name || ai.agent;
+        if (guessed !== ai.agent) setAgentActivity(guessed, 'idle');
+        if (ai.metadata?.routed_by === 'classifier') {
+            setAgentActivity('dispatcher', 'idle', `${agentName}에게 배정`);
+            setAgentActivity(ai.agent, 'working');
+        }
+        // In the 3D office the hand-over flies first; the result pops when it
+        // lands. Capped so a hidden tab (animation paused) can't hold it up.
+        const landed = state.office3d?.onResponse({
+            agent: ai.agent,
+            routedBy: ai.metadata?.routed_by,
+            filed: !!ai.metadata?.brain_refresh,
+            scheduled: !!ai.metadata?.calendar_refresh,
+        });
+        if (landed) await Promise.race([landed, wait(4000)]);
+        setAgentActivity(ai.agent, 'idle', bubbleSummary(ai.message));
+        showToast(`${agentName} 응답 완료`);
+        if (ai.metadata?.brain_refresh) loadEntries();
+        if (ai.metadata?.calendar_refresh) loadEvents();
+    } catch (err) {
+        console.error('Send failed:', err);
+        state.chatMessages = state.chatMessages.filter(m => !m._loading);
+        setAgentActivity(guessed, 'idle', '전송 실패');
+        state.chatMessages.push({
+            agent: 'dispatcher',
+            message: `메시지 전송 실패: ${err.message}`,
+            time: new Date().toTimeString().slice(0, 5),
+            type: 'system',
+        });
+        renderChatMessages();
+        showToast('전송 실패');
+    } finally {
+        setSending(false);
+    }
+}
+
+function initOfficeCommand() {
+    const form = document.getElementById('officeCommand');
+    const input = document.getElementById('officeInput');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = input.value.trim();
+        if (!message || state.sending) return;
+        input.value = '';
+        await sendMessage(message);
+        input.focus();
+    });
 }
 
 // Which staff member will most likely answer, so the office shows them working.
