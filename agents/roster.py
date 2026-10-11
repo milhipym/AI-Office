@@ -18,7 +18,7 @@ TEAMS = [
         "id": "front",
         "name": "운영지원팀",
         "code": "FRONT",
-        "desc": "메시지 접수 · 담당 배정 · 일반 업무 지원",
+        "desc": "메시지 접수 · 담당 배정 · 일정 관리 · 일반 업무 지원",
         "color": "#64748B",
     },
     {
@@ -57,7 +57,7 @@ ROOMS = [
 
 # "col,row" -> furniture id (see the furniture catalog in app.py).
 FURNITURE = {
-    "0,0": "plant", "1,1": "desk", "2,0": "coffee", "1,2": "desk",
+    "0,0": "plant", "1,1": "desk", "2,0": "coffee", "1,2": "desk", "2,2": "desk",
     "3,0": "bookshelf", "4,1": "desk", "5,1": "monitor", "5,0": "bookshelf",
     "6,0": "whiteboard", "7,1": "desk", "8,1": "chair", "6,2": "plant",
     "0,3": "bookshelf", "1,4": "desk", "2,3": "bookshelf", "3,4": "desk", "2,5": "desk",
@@ -97,6 +97,24 @@ STAFF = [
         "commands": ["비서", "질문", "ask"],
         "intent": None,  # fallback for "other"
         "example": "/비서 장애 보고 메일 초안 써줘",
+    },
+    {
+        "id": "scheduler",
+        "name": "일정 비서",
+        "short_name": "일정",
+        "team": "front",
+        "role": "일정 등록 · 조회",
+        "description": "일정을 등록하고 알려줍니다. 기록·회의록에 나온 앞으로의 일정과 마감도 일정표에 자동으로 올립니다.",
+        "avatar_color": "#EAB308",
+        "skills": ["일정 등록", "일정 조회", "마감 관리"],
+        "position": {"x": 2, "y": 2},
+        "model": config.MODEL_SCHEDULER,
+        "commands": ["일정", "schedule"],
+        "intent": {
+            "key": "schedule",
+            "desc": '앞으로 있을 일정·약속·마감을 등록하거나, 다가오는 일정을 물어보는 것 (예: "다음주 화요일 3시 보안 점검 회의", "이번주 일정 뭐 있어?"). 이미 한 일의 기록이 주된 내용이면 "log"',
+        },
+        "example": "/일정 다음주 화요일 15시 보안 점검 회의 본사 3층",
     },
     {
         "id": "archivist",

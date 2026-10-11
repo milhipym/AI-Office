@@ -36,6 +36,7 @@ MODEL_MINUTES = _model("MODEL_MINUTES", OPENAI_MODEL)
 MODEL_FINDER = _model("MODEL_FINDER", OPENAI_MODEL)
 MODEL_REPORTER = _model("MODEL_REPORTER", OPENAI_MODEL)
 MODEL_COACH = _model("MODEL_COACH", OPENAI_MODEL)
+MODEL_SCHEDULER = _model("MODEL_SCHEDULER", "gpt-4o-mini")
 EMBEDDING_MODEL = _model("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Fixed category list: letting the model invent categories makes the same

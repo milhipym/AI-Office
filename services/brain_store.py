@@ -41,6 +41,20 @@ CREATE TABLE IF NOT EXISTS entries (
     embedding_model TEXT                -- model that produced `embedding`
 );
 CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(entry_date);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,                 -- 'event' | 'deadline'
+    title TEXT NOT NULL,
+    event_date TEXT NOT NULL,           -- YYYY-MM-DD
+    start_time TEXT NOT NULL DEFAULT '',-- HH:MM, '' = all day
+    end_time TEXT NOT NULL DEFAULT '',
+    location TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    source_entry_id INTEGER,            -- record/meeting it was extracted from
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
 """
 
 
@@ -207,3 +221,75 @@ def cosine(a: list, b: list) -> float:
     if na == 0 or nb == 0:
         return 0.0
     return dot / (na * nb)
+
+
+# ==== Calendar events ====
+
+def _event_dict(row: sqlite3.Row) -> dict:
+    return {key: row[key] for key in row.keys()}
+
+
+def _title_key(title: str) -> str:
+    return "".join(title.split()).lower()
+
+
+def find_event(event_date: str, title: str) -> Optional[dict]:
+    """An existing event on the same day with the same title (ignoring spaces/case)."""
+    with _db() as conn:
+        rows = conn.execute("SELECT * FROM events WHERE event_date = ?", (event_date,)).fetchall()
+    key = _title_key(title)
+    for row in rows:
+        if _title_key(row["title"]) == key:
+            return _event_dict(row)
+    return None
+
+
+def add_event(
+    title: str,
+    event_date: str,
+    kind: str = "event",
+    start_time: str = "",
+    end_time: str = "",
+    location: str = "",
+    notes: str = "",
+    source_entry_id: Optional[int] = None,
+) -> dict:
+    with _lock, _db() as conn:
+        cur = conn.execute(
+            """INSERT INTO events
+               (kind, title, event_date, start_time, end_time, location, notes, source_entry_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (kind, title, event_date, start_time, end_time, location, notes, source_entry_id,
+             datetime.now().isoformat(timespec="seconds")),
+        )
+        row = conn.execute("SELECT * FROM events WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return _event_dict(row)
+
+
+def list_events(date_from: Optional[str] = None, date_to: Optional[str] = None) -> list:
+    """Events in an inclusive date range, soonest first (all-day before timed)."""
+    clauses, params = [], []
+    if date_from:
+        clauses.append("event_date >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("event_date <= ?")
+        params.append(date_to)
+    sql = "SELECT * FROM events"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY event_date, start_time, id"
+    with _db() as conn:
+        return [_event_dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def get_event(event_id: int) -> Optional[dict]:
+    with _db() as conn:
+        row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    return _event_dict(row) if row else None
+
+
+def delete_event(event_id: int) -> bool:
+    with _lock, _db() as conn:
+        cur = conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    return cur.rowcount > 0

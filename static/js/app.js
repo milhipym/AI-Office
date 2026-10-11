@@ -17,11 +17,15 @@ const state = {
     brainMeta: { categories: [], models: {} },
     office: { grid: { cols: 9, rows: 6 }, rooms: [], furniture: {}, teams: [] },
     activity: {},  // agent id -> latest speech bubble text
+    events: [],
+    calMonth: null,     // Date: first day of the month on screen
+    calSelected: null,  // 'YYYY-MM-DD' or null for "upcoming"
 };
 
 const AGENT_ICONS = {
     dispatcher: '🛎️',
     assistant: '💼',
+    scheduler: '📅',
     archivist: '🗂️',
     minutes: '📝',
     finder: '🔎',
@@ -112,6 +116,8 @@ async function loadData() {
         initOfficeView();
         initBrain();
         loadEntries();
+        initCalendar();
+        loadEvents();
         startAgentAnimations();
     } catch (err) {
         console.error('Failed to load data:', err);
@@ -727,6 +733,7 @@ function initChatInput() {
             setAgentActivity(ai.agent, 'idle', bubbleSummary(ai.message));
             showToast(`${agentName} 응답 완료`);
             if (ai.metadata?.brain_refresh) loadEntries();
+            if (ai.metadata?.calendar_refresh) loadEvents();
         } catch (err) {
             console.error('Send failed:', err);
             state.chatMessages = state.chatMessages.filter(m => !m._loading);
@@ -892,6 +899,165 @@ function renderBrain() {
                 ${(e.tags || []).length ? `<div class="entry-tags">${e.tags.map(t => `<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
                 <details class="entry-raw"><summary>원문</summary><pre>${escapeHtml(e.content)}</pre></details>
             </article>`;
+    }).join('');
+}
+
+// ===== CALENDAR =====
+const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+const UPCOMING_DAYS = 14;
+
+// Local-date ISO string. toISOString() would shift dates across the UTC line.
+function isoDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(d, n) {
+    const r = new Date(d);
+    r.setDate(r.getDate() + n);
+    return r;
+}
+
+async function loadEvents() {
+    try {
+        const res = await fetch('/api/events');
+        state.events = await res.json();
+        renderCalendar();
+    } catch (err) {
+        console.error('Failed to load events:', err);
+    }
+}
+
+function initCalendar() {
+    const now = new Date();
+    state.calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const shift = n => {
+        state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() + n, 1);
+        renderCalendar();
+    };
+    document.getElementById('calPrev').addEventListener('click', () => shift(-1));
+    document.getElementById('calNext').addEventListener('click', () => shift(1));
+    document.getElementById('calToday').addEventListener('click', () => {
+        const t = new Date();
+        state.calMonth = new Date(t.getFullYear(), t.getMonth(), 1);
+        state.calSelected = null;
+        renderCalendar();
+    });
+    document.getElementById('calShowUpcoming').addEventListener('click', () => {
+        state.calSelected = null;
+        renderCalendar();
+    });
+    document.getElementById('calAdd').addEventListener('click', () => {
+        document.querySelector('.nav-tab[data-tab="chat"]').click();
+        const input = document.getElementById('chatInput');
+        input.value = '/일정 ';
+        input.focus();
+    });
+    document.getElementById('calGrid').addEventListener('click', (e) => {
+        const cell = e.target.closest('.cal-cell');
+        if (!cell) return;
+        state.calSelected = cell.dataset.date;
+        renderCalendar();
+    });
+    document.getElementById('calSideList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.cal-delete');
+        if (!btn) return;
+        if (!confirm('이 일정을 삭제할까요?')) return;
+        const res = await fetch(`/api/events/${btn.dataset.id}`, { method: 'DELETE' });
+        if (res.ok) {
+            state.events = state.events.filter(ev => String(ev.id) !== btn.dataset.id);
+            renderCalendar();
+            showToast('일정 삭제됨');
+        }
+    });
+}
+
+function eventsByDate() {
+    const map = {};
+    state.events.forEach(ev => { (map[ev.event_date] ||= []).push(ev); });
+    return map;
+}
+
+function eventTime(ev) {
+    if (!ev.start_time) return ev.kind === 'deadline' ? '마감' : '종일';
+    return ev.end_time ? `${ev.start_time}~${ev.end_time}` : ev.start_time;
+}
+
+function renderCalendar() {
+    const grid = document.getElementById('calGrid');
+    if (!grid || !state.calMonth) return;
+
+    const month = state.calMonth;
+    document.getElementById('calTitle').textContent = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
+
+    const today = isoDate(new Date());
+    const byDate = eventsByDate();
+    // Monday-first grid, 6 weeks.
+    const offset = (month.getDay() + 6) % 7;
+    const start = addDays(month, -offset);
+
+    let html = '';
+    for (let i = 0; i < 42; i++) {
+        const d = addDays(start, i);
+        const iso = isoDate(d);
+        const events = byDate[iso] || [];
+        const classes = ['cal-cell'];
+        if (d.getMonth() !== month.getMonth()) classes.push('other');
+        if (iso === today) classes.push('today');
+        if (iso === state.calSelected) classes.push('selected');
+        if (d.getDay() === 0) classes.push('sun');
+        if (d.getDay() === 6) classes.push('sat');
+        const chips = events.slice(0, 3).map(ev => `
+            <div class="cal-chip ${ev.kind}" title="${escapeAttr(eventTime(ev) + ' ' + ev.title)}">
+                ${ev.start_time ? `<b>${escapeHtml(ev.start_time)}</b> ` : ''}${escapeHtml(ev.title)}
+            </div>`).join('');
+        const more = events.length > 3 ? `<div class="cal-more">+${events.length - 3}</div>` : '';
+        html += `<div class="${classes.join(' ')}" data-date="${iso}">
+            <span class="cal-day">${d.getDate()}</span>${chips}${more}</div>`;
+    }
+    grid.innerHTML = html;
+    renderCalendarSide(byDate, today);
+}
+
+function renderCalendarSide(byDate, today) {
+    const title = document.getElementById('calSideTitle');
+    const list = document.getElementById('calSideList');
+    const upcomingBtn = document.getElementById('calShowUpcoming');
+
+    let events;
+    if (state.calSelected) {
+        const d = new Date(state.calSelected + 'T00:00:00');
+        title.textContent = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
+        events = byDate[state.calSelected] || [];
+        upcomingBtn.hidden = false;
+    } else {
+        const until = isoDate(addDays(new Date(), UPCOMING_DAYS - 1));
+        title.textContent = `다가오는 일정 · ${UPCOMING_DAYS}일`;
+        events = state.events.filter(ev => ev.event_date >= today && ev.event_date <= until);
+        upcomingBtn.hidden = true;
+    }
+
+    if (!events.length) {
+        list.innerHTML = `<div class="brain-empty">일정이 없습니다.<br><code>/일정 다음주 화요일 15시 보안 점검</code><br>또는 기록·회의록에 앞으로의 일정을 적으면 자동으로 올라옵니다.</div>`;
+        return;
+    }
+
+    let lastDate = null;
+    list.innerHTML = events.map(ev => {
+        const d = new Date(ev.event_date + 'T00:00:00');
+        const header = !state.calSelected && ev.event_date !== lastDate
+            ? `<div class="cal-side-date ${ev.event_date === today ? 'today' : ''}">${d.getMonth() + 1}/${d.getDate()} (${WEEKDAY_KO[d.getDay()]})${ev.event_date === today ? ' · 오늘' : ''}</div>`
+            : '';
+        lastDate = ev.event_date;
+        return `${header}
+            <div class="cal-item ${ev.kind}">
+                <div class="cal-item-time">${escapeHtml(eventTime(ev))}</div>
+                <div class="cal-item-body">
+                    <div class="cal-item-title">${ev.kind === 'deadline' ? '⏰ ' : ''}${escapeHtml(ev.title)}</div>
+                    ${ev.location ? `<div class="cal-item-loc">📍 ${escapeHtml(ev.location)}</div>` : ''}
+                </div>
+                <a class="cal-ics" href="/api/events/${ev.id}.ics" download title="이 일정만 .ics로 받기">📥</a>
+                <button class="cal-delete entry-delete" data-id="${ev.id}" title="삭제">✕</button>
+            </div>`;
     }).join('');
 }
 

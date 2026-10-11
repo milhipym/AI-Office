@@ -37,13 +37,16 @@ def _month_bounds(year: int, month: int) -> tuple:
     return start, nxt - timedelta(days=1)
 
 
-def resolve_period(text: str, today: date) -> Optional[tuple]:
+def resolve_period(text: str, today: date, future: bool = False) -> Optional[tuple]:
     """Find a period expression in text.
 
     Returns (date_from, date_to, label) with ISO strings, or None when the
-    text names no period. The end date is capped at today.
+    text names no period. Records only exist up to today, so the end date is
+    capped at today unless future=True (calendar queries), which also enables
+    "내일", "다음주" and "다음달".
     """
     t = text or ""
+    cap = None if future else today
 
     explicit = ISO_DATE_RE.findall(t)
     if len(explicit) >= 2:
@@ -51,35 +54,50 @@ def resolve_period(text: str, today: date) -> Optional[tuple]:
         end = parse_iso("-".join(explicit[1]), today)
         if start > end:
             start, end = end, start
-        return _result(start, end, today, f"{start} ~ {end}")
+        return _result(start, end, cap, f"{start} ~ {end}")
 
     def has(*words):
         return any(w in t for w in words)
 
+    if future:
+        if has("모레"):
+            d = today + timedelta(days=2)
+            return _result(d, d, cap, "모레")
+        if has("내일"):
+            d = today + timedelta(days=1)
+            return _result(d, d, cap, "내일")
+        if has("다음주", "다음 주", "차주"):
+            start, end = week_bounds(today + timedelta(days=7))
+            return _result(start, end, cap, "다음 주")
+        if has("다음달", "다음 달"):
+            first_next = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+            start, end = _month_bounds(first_next.year, first_next.month)
+            return _result(start, end, cap, "다음 달")
+
     if has("오늘"):
-        return _result(today, today, today, "오늘")
+        return _result(today, today, cap, "오늘")
     if has("어제"):
         d = today - timedelta(days=1)
-        return _result(d, d, today, "어제")
+        return _result(d, d, cap, "어제")
     if has("지난주", "저번주", "지난 주", "저번 주"):
         start, end = week_bounds(today - timedelta(days=7))
-        return _result(start, end, today, "지난주")
+        return _result(start, end, cap, "지난주")
     if has("이번주", "이번 주", "금주"):
         start, end = week_bounds(today)
-        return _result(start, end, today, "이번 주")
+        return _result(start, end, cap, "이번 주")
     if has("지난달", "저번달", "지난 달", "저번 달"):
         last = today.replace(day=1) - timedelta(days=1)
         start, end = _month_bounds(last.year, last.month)
-        return _result(start, end, today, "지난달")
+        return _result(start, end, cap, "지난달")
     if has("이번달", "이번 달"):
         start, end = _month_bounds(today.year, today.month)
-        return _result(start, end, today, "이번 달")
+        return _result(start, end, cap, "이번 달")
 
     m = re.search(r"(?:최근|지난)\s*(\d+)\s*(개월|달|주|일)", t)
     if m:
         n, unit = int(m.group(1)), m.group(2)
         days = {"개월": 30, "달": 30, "주": 7, "일": 1}[unit] * n
-        return _result(today - timedelta(days=days - 1), today, today, f"최근 {n}{unit}")
+        return _result(today - timedelta(days=days - 1), today, cap, f"최근 {n}{unit}")
 
     year = today.year
     if has("작년", "지난해"):
@@ -91,26 +109,27 @@ def resolve_period(text: str, today: date) -> Optional[tuple]:
     year_named = has("작년", "지난해", "올해", "금년") or re.search(r"20\d{2}\s*년", t)
 
     if has("상반기"):
-        return _result(date(year, 1, 1), date(year, 6, 30), today, f"{year}년 상반기")
+        return _result(date(year, 1, 1), date(year, 6, 30), cap, f"{year}년 상반기")
     if has("하반기"):
-        return _result(date(year, 7, 1), date(year, 12, 31), today, f"{year}년 하반기")
+        return _result(date(year, 7, 1), date(year, 12, 31), cap, f"{year}년 하반기")
     q = re.search(r"([1-4])\s*분기", t)
     if q:
         n = int(q.group(1))
         start = date(year, 3 * n - 2, 1)
         _, end = _month_bounds(year, 3 * n)
-        return _result(start, end, today, f"{year}년 {n}분기")
+        return _result(start, end, cap, f"{year}년 {n}분기")
     if year_named:
-        return _result(date(year, 1, 1), date(year, 12, 31), today, f"{year}년")
+        return _result(date(year, 1, 1), date(year, 12, 31), cap, f"{year}년")
 
     if len(explicit) == 1:
         d = parse_iso("-".join(explicit[0]), today)
-        return _result(d, d, today, str(d))
+        return _result(d, d, cap, str(d))
     return None
 
 
-def _result(start: date, end: date, today: date, label: str) -> tuple:
-    end = min(end, today)
+def _result(start: date, end: date, cap: Optional[date], label: str) -> tuple:
+    if cap:
+        end = min(end, cap)
     return start.isoformat(), end.isoformat(), label
 
 

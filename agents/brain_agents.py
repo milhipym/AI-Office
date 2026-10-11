@@ -29,6 +29,7 @@ from .brain_common import (
     resolve_period,
     week_bounds,
 )
+from .schedule import calendar_note, deadlines_from_action_items, normalize_events, save_events
 from .brain_prompts import (
     COACH_PROMPT,
     FINDER_PROMPT,
@@ -140,9 +141,15 @@ class ArchivistAgent(BrainAgent):
             )
         if any(e["details"].get("achievement") and not e["details"].get("impact") for e in saved):
             lines += ["", "💡 성과로 보이는 기록입니다. 수치(시간 단축, 건수, 비율 등)를 덧붙이면 나중에 성과 정리에 그대로 쓰입니다."]
+
+        events = save_events(
+            normalize_events(result["data"].get("events"), now),
+            source_entry_id=saved[0]["id"] if saved else None,
+        )
         return AgentResponse(
-            text="\n".join(lines),
-            metadata=_meta(self, result, brain_refresh=True, entry_ids=[e["id"] for e in saved]),
+            text="\n".join(lines) + calendar_note(events),
+            metadata=_meta(self, result, brain_refresh=True, calendar_refresh=bool(events),
+                           entry_ids=[e["id"] for e in saved]),
         )
 
 
@@ -199,9 +206,16 @@ class MinutesAgent(BrainAgent):
             embedding=_embed_one(embedding_text(title, summary, message, tags)),
             embedding_model=EMBEDDING_MODEL,
         )
+        events = save_events(normalize_events(data.get("events"), now), source_entry_id=entry["id"])
+        events += save_events(
+            deadlines_from_action_items(details["action_items"], now),
+            kind="deadline",
+            source_entry_id=entry["id"],
+        )
         return AgentResponse(
-            text=render_minutes(entry),
-            metadata=_meta(self, result, brain_refresh=True, entry_ids=[entry["id"]]),
+            text=render_minutes(entry) + calendar_note(events),
+            metadata=_meta(self, result, brain_refresh=True, calendar_refresh=bool(events),
+                           entry_ids=[entry["id"]]),
         )
 
 
@@ -382,7 +396,18 @@ class ReporterAgent(BrainAgent):
                 text=f"📭 {label} 기간에 기록이 없어 주간 보고를 만들 수 없습니다.\n\n`/기록 ...`으로 그날그날 한 일을 남겨 주세요.",
                 metadata={"agent": self.id, "period": label},
             )
-        resp = _summarize(self, REPORTER_PROMPT, entries, f"[보고 기간] {label}\n[추가 요청] {message or '없음'}")
+        next_start, next_end = end + timedelta(days=1), end + timedelta(days=7)
+        upcoming = brain_store.list_events(next_start.isoformat(), next_end.isoformat())
+        calendar = "\n".join(
+            f"- {ev['event_date']} {ev['start_time']} {ev['title']}"
+            + (" (마감)" if ev["kind"] == "deadline" else "")
+            for ev in upcoming
+        ) or "없음"
+        resp = _summarize(
+            self, REPORTER_PROMPT, entries,
+            f"[보고 기간] {label}\n[추가 요청] {message or '없음'}\n"
+            f"[다음 7일 일정표 ({next_start} ~ {next_end})]\n{calendar}",
+        )
         resp.text = f"# 📊 주간 업무 보고 ({label})\n\n{resp.text}"
         resp.metadata["period"] = label
         return resp

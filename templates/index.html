@@ -46,6 +46,9 @@
             <button class="nav-tab" data-tab="brain">
                 <span class="tab-icon">&#9998;</span> 세컨브레인
             </button>
+            <button class="nav-tab" data-tab="calendar">
+                <span class="tab-icon">&#9783;</span> 일정표
+            </button>
             <button class="nav-tab" data-tab="org">
                 <span class="tab-icon">&#9733;</span> 조직도
             </button>
@@ -118,7 +121,7 @@
                             </button>
                         </div>
                         <div id="mentionDropdown" class="mention-dropdown"></div>
-                        <p class="chat-hint">⌨️ /기록 · /회의 · /찾기 · /주간 · /성과 · /비서 &nbsp;|&nbsp; 🛎️ 명령 없이 보내면 접수 매니저가 담당자에게 배정</p>
+                        <p class="chat-hint">⌨️ /기록 · /회의 · /일정 · /찾기 · /주간 · /성과 · /비서 &nbsp;|&nbsp; 🛎️ 명령 없이 보내면 접수 매니저가 담당자에게 배정</p>
                     </div>
                 </div>
             </div>
@@ -143,6 +146,36 @@
                 </div>
                 <div class="brain-stats" id="brainStats"></div>
                 <div class="brain-list" id="brainList"></div>
+            </div>
+        </section>
+
+        <!-- ===== CALENDAR VIEW ===== -->
+        <section id="tab-calendar" class="tab-content">
+            <div class="cal-container">
+                <div class="cal-main">
+                    <div class="cal-header">
+                        <button class="brain-btn" id="calPrev" aria-label="이전 달">◀</button>
+                        <h3 class="cal-title" id="calTitle"></h3>
+                        <button class="brain-btn" id="calNext" aria-label="다음 달">▶</button>
+                        <button class="brain-btn" id="calToday">오늘</button>
+                        <div class="cal-actions">
+                            <button class="brain-btn" id="calAdd">＋ 일정 추가</button>
+                            <a class="brain-btn" href="/api/events.ics" download
+                               title="오늘 이후 일정을 .ics로 받아 Google · Apple · Outlook 캘린더에서 가져오기">📥 내보내기 (.ics)</a>
+                        </div>
+                    </div>
+                    <div class="cal-weekdays">
+                        <span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span><span class="sun">일</span>
+                    </div>
+                    <div class="cal-grid" id="calGrid"></div>
+                </div>
+                <aside class="cal-side">
+                    <div class="cal-side-head">
+                        <h3 id="calSideTitle">다가오는 일정</h3>
+                        <button class="brain-btn" id="calShowUpcoming" hidden>다가오는 일정</button>
+                    </div>
+                    <div class="cal-side-list" id="calSideList"></div>
+                </aside>
             </div>
         </section>
 

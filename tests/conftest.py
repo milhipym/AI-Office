@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from agents import brain_agents  # noqa: E402
+from agents import brain_agents, schedule  # noqa: E402
 from services import brain_store  # noqa: E402
 
 TODAY = date(2026, 10, 14)  # a Wednesday
@@ -17,6 +17,8 @@ def isolated_db(tmp_path, monkeypatch):
     monkeypatch.setattr(brain_store, "DB_PATH", tmp_path / "brain.db")
     monkeypatch.setattr(brain_agents, "today", lambda: TODAY)
     monkeypatch.setattr(brain_agents, "is_openai_configured", lambda: True)
+    monkeypatch.setattr(schedule, "today", lambda: TODAY)
+    monkeypatch.setattr(schedule, "is_openai_configured", lambda: True)
 
 
 class FakeOpenAI:
@@ -48,4 +50,5 @@ def fake_openai(monkeypatch):
     monkeypatch.setattr(brain_agents, "json_completion", fake.json_completion)
     monkeypatch.setattr(brain_agents, "chat_completion", fake.chat_completion)
     monkeypatch.setattr(brain_agents, "embed", fake.embed)
+    monkeypatch.setattr(schedule, "json_completion", fake.json_completion)
     return fake

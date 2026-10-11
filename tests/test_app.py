@@ -29,7 +29,7 @@ def test_brain_meta_agents_and_office():
     assert "기타" in meta["categories"]
     assert set(meta["models"]) >= {"archivist", "finder", "reporter", "coach", "embedding"}
     ids = {a["id"] for a in client.get("/api/agents").get_json()}
-    assert ids == {"dispatcher", "assistant", "archivist", "minutes", "finder", "reporter", "coach"}
+    assert ids == {"dispatcher", "assistant", "scheduler", "archivist", "minutes", "finder", "reporter", "coach"}
     office = client.get("/api/office").get_json()
     assert office["grid"] == {"cols": 9, "rows": 6}
     assert any(r.get("planned") for r in office["rooms"])

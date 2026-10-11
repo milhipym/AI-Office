@@ -8,14 +8,14 @@ Teams, rooms and staff are defined in agents/roster.py.
 import random
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 import config
 from agents import roster
 from agents.brain_agents import reembed_stale
 from agents.router import dispatch, is_smalltalk
 from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
-from services import brain_store, storage
+from services import brain_store, ics, storage
 from services.openai_client import OpenAIError
 
 # Canned smalltalk replies — avoid burning tokens on "안녕"
@@ -163,6 +163,7 @@ def get_brain_meta():
             "finder": config.MODEL_FINDER,
             "reporter": config.MODEL_REPORTER,
             "coach": config.MODEL_COACH,
+            "scheduler": config.MODEL_SCHEDULER,
             "embedding": config.EMBEDDING_MODEL,
         },
         # Records whose embedding is missing or from another model; search
@@ -183,6 +184,46 @@ def reembed():
             "remaining": brain_store.count_stale(config.EMBEDDING_MODEL),
         }), 502
     return jsonify({"updated": updated, "remaining": brain_store.count_stale(config.EMBEDDING_MODEL)})
+
+
+# ==== Calendar ====
+
+@app.route("/api/events")
+def get_events():
+    return jsonify(brain_store.list_events(
+        date_from=request.args.get("from") or None,
+        date_to=request.args.get("to") or None,
+    ))
+
+
+@app.route("/api/events/<int:event_id>", methods=["DELETE"])
+def delete_event(event_id):
+    if brain_store.delete_event(event_id):
+        return jsonify({"status": "deleted", "id": event_id})
+    return jsonify({"error": "Event not found"}), 404
+
+
+def _ics_response(events: list, filename: str) -> Response:
+    return Response(
+        ics.to_ics(events),
+        mimetype="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.route("/api/events.ics")
+def export_events():
+    """All events from today on (past ones are rarely worth importing)."""
+    since = request.args.get("from") or datetime.now().date().isoformat()
+    return _ics_response(brain_store.list_events(date_from=since), "ai-office.ics")
+
+
+@app.route("/api/events/<int:event_id>.ics")
+def export_event(event_id):
+    event = brain_store.get_event(event_id)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+    return _ics_response([event], f"event-{event_id}.ics")
 
 
 @app.route("/api/furniture")

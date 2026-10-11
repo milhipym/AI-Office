@@ -7,6 +7,19 @@ change at runtime.
 from config import BRAIN_CATEGORIES
 
 
+# Shared by every prompt that extracts calendar events.
+EVENT_FIELDS = """{"title": "...",      // 20자 이내. 예: "보안 점검 회의"
+     "date": "YYYY-MM-DD", // "다음주 화요일" 등은 오늘 기준으로 계산
+     "time": "HH:MM",      // 24시간제. 시각 언급 없으면 빈 문자열 (종일 일정)
+     "end_time": "HH:MM",  // 언급 없으면 빈 문자열
+     "location": "..."}    // 언급 없으면 빈 문자열"""
+
+EVENT_RULES = """일정 추출 규칙:
+- 오늘 이후에 '일어날' 일만 일정입니다. 이미 지난 일, 오늘 이미 끝난 일은 넣지 마세요.
+- 날짜가 구체적이지 않으면("다음주쯤", "조만간", "월말 즈음") 넣지 마세요.
+- "오후 3시" → "15:00", "아침 9시 반" → "09:30"."""
+
+
 def classifier_prompt() -> str:
     """Built from the roster so a new team's intent is classified automatically."""
     from .roster import STAFF
@@ -36,11 +49,15 @@ def archivist_prompt(today: str, weekday: str) -> str:
     "achievement": true/false,  // 성과로 내세울 만한 일인가 (문제 해결, 출시, 개선, 수치 향상 등)
     "impact": "..."             // 원문에 수치/효과가 있으면 그대로, 없으면 빈 문자열
   }}
-]}}
+],
+ "events": [                    // 원문에 언급된 '앞으로의' 일정·약속·마감. 없으면 []
+  {EVENT_FIELDS}
+ ]}}
 
 원칙:
 - 원문에 없는 수치나 결과를 지어내지 마세요.
-- 카테고리 목록에 맞는 게 없으면 "기타"."""
+- 카테고리 목록에 맞는 게 없으면 "기타".
+{EVENT_RULES}"""
 
 
 def minutes_prompt(today: str, weekday: str) -> str:
@@ -55,12 +72,30 @@ def minutes_prompt(today: str, weekday: str) -> str:
   "decisions": ["..."],           // 확정된 결정사항만. 논의만 된 것은 제외
   "action_items": [{{"task": "...", "owner": "...", "due": "YYYY-MM-DD 또는 빈 문자열"}}],
   "open_issues": ["..."],         // 결론 나지 않은 쟁점
-  "tags": ["..."]                 // 검색용 키워드 1~5개
+  "tags": ["..."],                // 검색용 키워드 1~5개
+  "events": [                     // 다음 회의·후속 미팅 등 앞으로 잡힌 일정 (액션 아이템 기한은 제외). 없으면 []
+    {EVENT_FIELDS}
+  ]
 }}
 
 원칙:
 - 메모에 없는 결정·담당자·기한을 만들어내지 마세요. 담당자 불명이면 owner는 빈 문자열.
-- "다음 주 수요일까지" 같은 기한은 오늘 기준 날짜로 변환."""
+- "다음 주 수요일까지" 같은 기한은 오늘 기준 날짜로 변환.
+{EVENT_RULES}"""
+
+
+def scheduler_prompt(today: str, weekday: str) -> str:
+    return f"""당신은 일정 비서입니다. 오늘은 {today} ({weekday}요일)입니다.
+사용자 메시지가 일정을 '등록'하려는 것인지 '조회'하려는 것인지 판단해 JSON으로만 답하세요.
+
+{{
+  "mode": "add" 또는 "query",   // "이번주 일정 뭐 있어?", "내일 일정"은 query
+  "events": [                   // mode가 add일 때만. 메시지에 있는 일정 전부
+    {EVENT_FIELDS}
+  ]
+}}
+
+{EVENT_RULES}"""
 
 
 FINDER_PROMPT = """당신은 사용자의 과거 업무 기록을 찾아 답하는 검색 담당입니다.
@@ -89,7 +124,7 @@ REPORTER_PROMPT = """당신은 주간 업무 보고 작성 담당입니다. 아�
 (기록에 근거가 있을 때만. 없으면 "특이사항 없음")
 
 ## 🔜 다음 주 계획
-미완료 액션 아이템과 기록에 언급된 계획만. 없으면 "기록된 계획 없음"
+[다음 7일 일정표]의 일정·마감, 미완료 액션 아이템, 기록에 언급된 계획만. 없으면 "기록된 계획 없음"
 
 원칙:
 - 기록에 없는 업무·수치를 만들어내지 마세요.
