@@ -5,7 +5,7 @@ import re
 from .base import BaseAgent, AgentResponse, ImageResult, extract_code_blocks
 from .prompts import GEMINI_PROMPT
 from services.openai_client import chat_completion, generate_image, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 # Keywords that indicate the user wants an actual image
@@ -25,7 +25,7 @@ class GeminiAgent(BaseAgent):
     id = "gemini"
     name = "Gemini"
     role = "디자이너 - 콘텐츠 / 이미지"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = GEMINI_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

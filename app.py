@@ -10,9 +10,10 @@ from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 
 from agents import AGENTS
-from agents.router import route, strip_mention, is_smalltalk
-from config import FLASK_DEBUG, FLASK_PORT, is_openai_configured
-from services import storage
+from agents.router import dispatch, is_smalltalk
+import config
+from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
+from services import brain_store, storage
 
 
 # Canned smalltalk replies — avoid burning tokens on "안녕"
@@ -35,6 +36,7 @@ AI_AGENTS_DISPLAY = {
     "claude": {
         "id": "claude",
         "name": "Claude Opus",
+        "short_name": "Opus",
         "role": "CTO",
         "team": "management",
         "description": "기술 총괄 / 아키텍처 설계",
@@ -57,6 +59,7 @@ AI_AGENTS_DISPLAY = {
     "sonnet": {
         "id": "sonnet",
         "name": "Claude Sonnet",
+        "short_name": "Sonnet",
         "role": "개발자",
         "team": "build",
         "description": "시니어 풀스택 개발자 / 코드 생성",
@@ -97,6 +100,69 @@ AI_AGENTS_DISPLAY = {
         "skills": ["웹 검색", "팩트체크", "인용"],
         "status": "working",
         "position": {"x": 5, "y": 5},
+    },
+    # ---- Second brain team ----
+    "archivist": {
+        "id": "archivist",
+        "name": "아카이브",
+        "role": "기록 담당",
+        "team": "brain",
+        "description": "자연어 업무 기록 → 날짜·분류·태그 정리 (/기록)",
+        "avatar_color": "#14B8A6",
+        "skills": ["업무 일지", "자동 분류", "태그"],
+        "status": "working",
+        "position": {"x": 1, "y": 2},
+        "model": config.MODEL_ARCHIVIST,
+    },
+    "minutes": {
+        "id": "minutes",
+        "name": "회의록 서기",
+        "short_name": "서기",
+        "role": "회의록 담당",
+        "team": "brain",
+        "description": "회의 메모 → 결정사항·액션 아이템 (/회의)",
+        "avatar_color": "#0EA5E9",
+        "skills": ["회의록", "결정사항", "액션 아이템"],
+        "status": "meeting",
+        "position": {"x": 6, "y": 1},
+        "model": config.MODEL_MINUTES,
+    },
+    "finder": {
+        "id": "finder",
+        "name": "파인더",
+        "role": "기록 검색 담당",
+        "team": "brain",
+        "description": "\"그거 언제였지?\" 과거 기록 검색 (/찾기)",
+        "avatar_color": "#84CC16",
+        "skills": ["의미 검색", "기간 필터", "근거 인용"],
+        "status": "idle",
+        "position": {"x": 2, "y": 3},
+        "model": config.MODEL_FINDER,
+    },
+    "reporter": {
+        "id": "reporter",
+        "name": "리포터",
+        "role": "주간 보고 담당",
+        "team": "brain",
+        "description": "한 주 기록 → 주간 업무 보고 초안 (/주간)",
+        "avatar_color": "#F97316",
+        "skills": ["주간 보고", "이슈 정리", "다음 주 계획"],
+        "status": "working",
+        "position": {"x": 6, "y": 6},
+        "model": config.MODEL_REPORTER,
+    },
+    "coach": {
+        "id": "coach",
+        "name": "커리어 코치",
+        "short_name": "코치",
+        "role": "성과 · 커리어 정리",
+        "team": "brain",
+        "description": "기간별 기록 → STAR 성과, 이력서 문장 (/성과)",
+        "avatar_color": "#EC4899",
+        "skills": ["성과 정리", "STAR", "이력서"],
+        "status": "idle",
+        "position": {"x": 1, "y": 6},
+        "model": config.MODEL_COACH,
     },
 }
 
@@ -166,8 +232,7 @@ def send_message():
         })
 
     # Route to the appropriate agent
-    agent = route(user_message, channel=channel)
-    cleaned_message = strip_mention(user_message)
+    agent, cleaned_message = dispatch(user_message, channel=channel)
 
     # Load recent history for context (excluding the message we just added)
     history = storage.load_history()[:-1]
@@ -206,6 +271,43 @@ def send_message():
 def clear_chat():
     storage.clear_history()
     return jsonify({"status": "cleared"})
+
+
+# ==== Second brain records ====
+
+@app.route("/api/entries")
+def get_entries():
+    entries = brain_store.list_entries(
+        date_from=request.args.get("from") or None,
+        date_to=request.args.get("to") or None,
+        category=request.args.get("category") or None,
+        kind=request.args.get("kind") or None,
+        limit=min(request.args.get("limit", 500, type=int) or 500, 2000),
+    )
+    return jsonify(entries)
+
+
+@app.route("/api/entries/<int:entry_id>", methods=["DELETE"])
+def delete_entry(entry_id):
+    if brain_store.delete_entry(entry_id):
+        return jsonify({"status": "deleted", "id": entry_id})
+    return jsonify({"error": "Entry not found"}), 404
+
+
+@app.route("/api/brain/meta")
+def get_brain_meta():
+    return jsonify({
+        "categories": config.BRAIN_CATEGORIES,
+        "models": {
+            "classifier": config.MODEL_CLASSIFIER,
+            "archivist": config.MODEL_ARCHIVIST,
+            "minutes": config.MODEL_MINUTES,
+            "finder": config.MODEL_FINDER,
+            "reporter": config.MODEL_REPORTER,
+            "coach": config.MODEL_COACH,
+            "embedding": config.EMBEDDING_MODEL,
+        },
+    })
 
 
 @app.route("/api/rooms")
@@ -287,6 +389,13 @@ def get_org_chart():
                 "color": "#10B981",
                 "agents": ["ChatGPT (GPT-4o)"],
             },
+            {
+                "name": "세컨브레인팀",
+                "code": "BRAIN",
+                "desc": "기록 · 회의록 · 검색 · 주간보고 · 성과",
+                "color": "#14B8A6",
+                "agents": ["아카이브", "회의록 서기", "파인더", "리포터", "커리어 코치"],
+            },
         ],
     })
 
@@ -307,4 +416,4 @@ if __name__ == "__main__":
         print("   Copy .env.example to .env and add your key.")
         print("   The app will still run, but agents will return placeholders.")
         print("=" * 60)
-    app.run(debug=FLASK_DEBUG, host="0.0.0.0", port=FLASK_PORT)
+    app.run(debug=FLASK_DEBUG, host=FLASK_HOST, port=FLASK_PORT)

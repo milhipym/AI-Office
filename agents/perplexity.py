@@ -3,14 +3,14 @@
 from .base import BaseAgent, AgentResponse, Citation
 from .prompts import PERPLEXITY_PROMPT
 from services.openai_client import web_search_response, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 class PerplexityAgent(BaseAgent):
     id = "perplexity"
     name = "Perplexity"
     role = "리서처 - 실시간 웹 검색"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = PERPLEXITY_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

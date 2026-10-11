@@ -4,10 +4,17 @@ All agents go through these helpers so we have a single place to handle
 errors, missing API keys, and model switching.
 """
 
+import json
 import time
 from typing import Optional
 
-from config import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_IMAGE_MODEL, is_openai_configured
+from config import (
+    EMBEDDING_MODEL,
+    OPENAI_API_KEY,
+    OPENAI_IMAGE_MODEL,
+    OPENAI_MODEL,
+    is_openai_configured,
+)
 
 _client = None
 
@@ -20,7 +27,9 @@ def _get_client():
         return None
     try:
         from openai import OpenAI
-        _client = OpenAI(api_key=OPENAI_API_KEY)
+        # Without a timeout the SDK waits up to 10 minutes per call and the
+        # synchronous Flask request hangs with it.
+        _client = OpenAI(api_key=OPENAI_API_KEY, timeout=90.0, max_retries=1)
         return _client
     except ImportError:
         return None
@@ -35,9 +44,12 @@ def chat_completion(
     user_message: str,
     history: Optional[list] = None,
     model: Optional[str] = None,
-    temperature: float = 0.7,
+    temperature: Optional[float] = 0.7,
+    json_mode: bool = False,
 ) -> dict:
     """Call chat.completions.create and return a normalized dict.
+
+    temperature=None omits the parameter, which reasoning models require.
 
     Returns: {"text": str, "model": str, "tokens": int, "latency_ms": int}
     """
@@ -55,11 +67,12 @@ def chat_completion(
 
     start = time.time()
     try:
-        resp = client.chat.completions.create(
-            model=model or OPENAI_MODEL,
-            messages=messages,
-            temperature=temperature,
-        )
+        kwargs = {"model": model or OPENAI_MODEL, "messages": messages}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = client.chat.completions.create(**kwargs)
     except Exception as e:
         raise OpenAIError(f"OpenAI chat completion failed: {e}") from e
 
@@ -70,6 +83,41 @@ def chat_completion(
         "tokens": resp.usage.total_tokens if resp.usage else 0,
         "latency_ms": latency_ms,
     }
+
+
+def json_completion(system_prompt: str, user_message: str, model: Optional[str] = None) -> dict:
+    """Chat completion in JSON mode, parsed. Raises OpenAIError on bad JSON.
+
+    Returns: {"data": dict, "model": str, "tokens": int, "latency_ms": int}
+    """
+    result = chat_completion(
+        system_prompt=system_prompt,
+        user_message=user_message,
+        model=model,
+        temperature=None,
+        json_mode=True,
+    )
+    try:
+        data = json.loads(result["text"])
+    except json.JSONDecodeError as e:
+        raise OpenAIError(f"Model returned invalid JSON: {e}") from e
+    if not isinstance(data, dict):
+        raise OpenAIError("Model returned JSON that is not an object")
+    return {**result, "data": data}
+
+
+def embed(texts: list, model: Optional[str] = None) -> list:
+    """Return one embedding vector (list of floats) per input text."""
+    client = _get_client()
+    if client is None:
+        raise OpenAIError("OpenAI client is not configured. Set OPENAI_API_KEY in .env")
+    if not texts:
+        return []
+    try:
+        resp = client.embeddings.create(model=model or EMBEDDING_MODEL, input=texts)
+    except Exception as e:
+        raise OpenAIError(f"OpenAI embedding failed: {e}") from e
+    return [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
 
 
 def generate_image(prompt: str, size: str = "1024x1024") -> dict:

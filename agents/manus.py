@@ -3,14 +3,14 @@
 from .base import BaseAgent, AgentResponse, extract_code_blocks
 from .prompts import MANUS_PROMPT
 from services.openai_client import chat_completion, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 class ManusAgent(BaseAgent):
     id = "manus"
     name = "Manus"
     role = "PM - 태스크 분해 / 계획"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = MANUS_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

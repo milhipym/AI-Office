@@ -13,6 +13,8 @@ const state = {
     selectedFurniture: null,
     activeCategory: '전체',
     placedItems: {},  // grid position -> furniture item
+    entries: [],
+    brainMeta: { categories: [], models: {} },
 };
 
 // ===== PIXEL ART CHARACTERS (CSS-based) =====
@@ -23,6 +25,11 @@ const AGENT_EMOJIS = {
     gemini: '🟡',
     chatgpt: '🟢',
     perplexity: '🔮',
+    archivist: '🗂️',
+    minutes: '📝',
+    finder: '🔎',
+    reporter: '📊',
+    coach: '🧭',
     user: '👤',
 };
 
@@ -122,12 +129,13 @@ function initMarkdown() {
 
 async function loadData() {
     try {
-        const [agentsRes, chatRes, furnitureRes, orgRes, statusRes] = await Promise.all([
+        const [agentsRes, chatRes, furnitureRes, orgRes, statusRes, metaRes] = await Promise.all([
             fetch('/api/agents'),
             fetch('/api/chat'),
             fetch('/api/furniture'),
             fetch('/api/org'),
             fetch('/api/status'),
+            fetch('/api/brain/meta'),
         ]);
 
         state.agents = await agentsRes.json();
@@ -135,7 +143,9 @@ async function loadData() {
         state.furniture = await furnitureRes.json();
         state.orgData = await orgRes.json();
         state.apiStatus = await statusRes.json();
+        state.brainMeta = await metaRes.json();
         state.placedItems = { ...DEFAULT_FURNITURE };
+        document.querySelectorAll('.agent-count').forEach(el => { el.textContent = state.agents.length; });
 
         renderApiBadge();
         renderOffice();
@@ -144,6 +154,8 @@ async function loadData() {
         renderOrgChart();
         renderCustomize();
         initChatInput();
+        initBrain();
+        loadEntries();
         startAgentAnimations();
     } catch (err) {
         console.error('Failed to load data:', err);
@@ -245,7 +257,7 @@ function renderAgentsOnGrid(grid) {
                 </div>
                 <div class="agent-status-badge ${agent.status}"></div>
             </div>
-            <div class="name-tag">${agent.name.split(' ')[0]}</div>
+            <div class="name-tag">${escapeHtml(agent.short_name || agent.name.split(' ')[0])}</div>
         `;
 
         agentEl.addEventListener('click', () => showAgentInfo(agent));
@@ -439,7 +451,8 @@ function buildMessageElement(msg) {
         msg.citations.forEach(c => {
             const item = document.createElement('a');
             item.className = 'citation-item';
-            item.href = c.url;
+            // Search results are untrusted: only allow web links, never javascript: etc.
+            item.href = /^https?:\/\//i.test(c.url || '') ? c.url : '#';
             item.target = '_blank';
             item.rel = 'noopener';
             item.innerHTML = `
@@ -547,8 +560,43 @@ function initChatInput() {
         { id: 'perplexity', name: 'Perplexity', role: '리서처 / 검색', icon: '🔎' },
     ];
 
+    const COMMAND_LIST = [
+        { id: '기록', name: '아카이브', role: '오늘 한 일 기록', icon: '🗂️' },
+        { id: '회의', name: '회의록 서기', role: '회의 메모 → 회의록', icon: '📝' },
+        { id: '찾기', name: '파인더', role: '과거 기록 검색', icon: '🔎' },
+        { id: '주간', name: '리포터', role: '주간 보고 (지난주 가능)', icon: '📊' },
+        { id: '성과', name: '커리어 코치', role: '기간별 성과 정리', icon: '🧭' },
+    ];
+
+    const showDropdown = (items, prefixChar) => {
+        dropdown.innerHTML = items.map(m => `
+            <div class="mention-item" data-id="${m.id}">
+                <span class="mention-icon">${m.icon}</span>
+                <div class="mention-info">
+                    <div class="mention-name">${prefixChar}${m.id}</div>
+                    <div class="mention-role">${m.name} · ${m.role}</div>
+                </div>
+            </div>
+        `).join('');
+        dropdown.classList.add('open');
+        dropdown.querySelectorAll('.mention-item').forEach(item => {
+            item.addEventListener('click', () => {
+                input.value = `${prefixChar}${item.dataset.id} `;
+                dropdown.classList.remove('open');
+                input.focus();
+            });
+        });
+    };
+
     const updateMentionDropdown = () => {
         const value = input.value;
+        const slashMatch = value.match(/^\/(\S*)$/);
+        if (slashMatch) {
+            const filtered = COMMAND_LIST.filter(c => c.id.startsWith(slashMatch[1]));
+            if (filtered.length) showDropdown(filtered, '/');
+            else dropdown.classList.remove('open');
+            return;
+        }
         const atMatch = value.match(/^@(\w*)$/);
         if (!atMatch) {
             dropdown.classList.remove('open');
@@ -561,23 +609,7 @@ function initChatInput() {
             dropdown.classList.remove('open');
             return;
         }
-        dropdown.innerHTML = filtered.map(m => `
-            <div class="mention-item" data-id="${m.id}">
-                <span class="mention-icon">${m.icon}</span>
-                <div class="mention-info">
-                    <div class="mention-name">@${m.id}</div>
-                    <div class="mention-role">${m.name} · ${m.role}</div>
-                </div>
-            </div>
-        `).join('');
-        dropdown.classList.add('open');
-        dropdown.querySelectorAll('.mention-item').forEach(item => {
-            item.addEventListener('click', () => {
-                input.value = `@${item.dataset.id} `;
-                dropdown.classList.remove('open');
-                input.focus();
-            });
-        });
+        showDropdown(filtered, '@');
     };
 
     const send = async () => {
@@ -627,6 +659,7 @@ function initChatInput() {
 
             const agentName = state.agents.find(a => a.id === data.ai_response.agent)?.name || data.ai_response.agent;
             showToast(`${agentName} 응답 완료`);
+            if (data.ai_response.metadata?.brain_refresh) loadEntries();
         } catch (err) {
             console.error('Send failed:', err);
             state.chatMessages = state.chatMessages.filter(m => !m._loading);
@@ -658,6 +691,12 @@ function initChatInput() {
 // Very rough client-side guess so the loading placeholder shows the right avatar
 function guessAgent(message) {
     const m = message.trim();
+    const command = m.match(/^\/(\S+)/);
+    if (command) {
+        const map = { '기록': 'archivist', '회의': 'minutes', '회의록': 'minutes', '찾기': 'finder',
+                      '검색': 'finder', '주간': 'reporter', '주간보고': 'reporter', '성과': 'coach', '커리어': 'coach' };
+        if (map[command[1]]) return map[command[1]];
+    }
     const mention = m.match(/^@(\w+)/);
     if (mention) {
         const id = mention[1].toLowerCase();
@@ -673,6 +712,114 @@ function guessAgent(message) {
     if (/이미지|로고|디자인|image|logo/.test(lower)) return 'gemini';
     if (/분석|보고서|커리큘럼|analysis|report/.test(lower)) return 'chatgpt';
     return 'manus';
+}
+
+// ===== SECOND BRAIN =====
+async function loadEntries() {
+    try {
+        const res = await fetch('/api/entries');
+        state.entries = await res.json();
+        renderBrain();
+    } catch (err) {
+        console.error('Failed to load entries:', err);
+    }
+}
+
+function initBrain() {
+    const select = document.getElementById('brainCategory');
+    (state.brainMeta.categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+    });
+    ['brainSearch', 'brainCategory', 'brainKind'].forEach(id => {
+        document.getElementById(id).addEventListener('input', renderBrain);
+    });
+    document.querySelectorAll('.brain-btn[data-command]').forEach(btn => {
+        btn.addEventListener('click', () => runCommandInChat(btn.dataset.command));
+    });
+    document.getElementById('brainList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.entry-delete');
+        if (!btn) return;
+        if (!confirm('이 기록을 삭제할까요? 되돌릴 수 없습니다.')) return;
+        const res = await fetch(`/api/entries/${btn.dataset.id}`, { method: 'DELETE' });
+        if (res.ok) {
+            state.entries = state.entries.filter(x => String(x.id) !== btn.dataset.id);
+            renderBrain();
+            showToast('기록 삭제됨');
+        }
+    });
+}
+
+function runCommandInChat(command) {
+    document.querySelector('.nav-tab[data-tab="chat"]').click();
+    const input = document.getElementById('chatInput');
+    input.value = command;
+    document.getElementById('sendBtn').click();
+}
+
+function renderBrain() {
+    const list = document.getElementById('brainList');
+    const stats = document.getElementById('brainStats');
+    if (!list) return;
+
+    const q = document.getElementById('brainSearch').value.trim().toLowerCase();
+    const category = document.getElementById('brainCategory').value;
+    const kind = document.getElementById('brainKind').value;
+
+    const filtered = state.entries.filter(e =>
+        (!category || e.category === category) &&
+        (!kind || e.kind === kind) &&
+        (!q || [e.title, e.summary, e.content, (e.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
+    );
+
+    const achievements = state.entries.filter(e => e.details?.achievement).length;
+    const meetings = state.entries.filter(e => e.kind === 'meeting').length;
+    const models = state.brainMeta.models || {};
+    stats.innerHTML = `
+        <span>전체 <b>${state.entries.length}</b>건</span>
+        <span>회의록 <b>${meetings}</b>건</span>
+        <span>🏆 성과 후보 <b>${achievements}</b>건</span>
+        <span>표시 중 <b>${filtered.length}</b>건</span>
+        <span class="brain-models" title="에이전트별 모델 (.env에서 변경)">
+            모델: 기록 ${escapeHtml(models.archivist || '')} · 검색 ${escapeHtml(models.finder || '')} · 보고 ${escapeHtml(models.reporter || '')} · 성과 ${escapeHtml(models.coach || '')}
+        </span>
+    `;
+
+    if (filtered.length === 0) {
+        list.innerHTML = state.entries.length === 0
+            ? `<div class="brain-empty">아직 기록이 없습니다.<br>팀 채팅에서 <code>/기록 오늘 한 일</code> 또는 <code>/회의 회의 메모</code>로 시작하세요.</div>`
+            : `<div class="brain-empty">조건에 맞는 기록이 없습니다.</div>`;
+        return;
+    }
+
+    let lastDate = null;
+    list.innerHTML = filtered.map(e => {
+        const dateHeader = e.entry_date !== lastDate ? `<div class="brain-date">${escapeHtml(e.entry_date)}</div>` : '';
+        lastDate = e.entry_date;
+        const d = e.details || {};
+        const actions = (d.action_items || []).map(i =>
+            `<li>${escapeHtml(i.task)} <span class="muted">— ${escapeHtml(i.owner || '미정')}${i.due ? ' · ' + escapeHtml(i.due) : ''}</span></li>`
+        ).join('');
+        const decisions = (d.decisions || []).map(x => `<li>${escapeHtml(x)}</li>`).join('');
+        return `${dateHeader}
+            <article class="entry-card ${e.kind}">
+                <div class="entry-head">
+                    <span class="entry-kind">${e.kind === 'meeting' ? '📝 회의' : '🗂️ 기록'}</span>
+                    <span class="entry-category">${escapeHtml(e.category)}</span>
+                    <span class="entry-title">${escapeHtml(e.title)}${d.achievement ? ' 🏆' : ''}</span>
+                    <span class="entry-id">#${e.id}</span>
+                    <button class="entry-delete" data-id="${e.id}" title="삭제">✕</button>
+                </div>
+                ${e.summary ? `<div class="entry-summary">${escapeHtml(e.summary)}</div>` : ''}
+                ${d.impact ? `<div class="entry-impact">📈 ${escapeHtml(d.impact)}</div>` : ''}
+                ${decisions ? `<div class="entry-section"><b>결정사항</b><ul>${decisions}</ul></div>` : ''}
+                ${actions ? `<div class="entry-section"><b>액션 아이템</b><ul>${actions}</ul></div>` : ''}
+                ${(e.tags || []).length ? `<div class="entry-tags">${e.tags.map(t => `<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+                <details class="entry-raw"><summary>원문</summary><pre>${escapeHtml(e.content)}</pre></details>
+            </article>`;
+    }).join('');
 }
 
 // ===== ORG CHART =====

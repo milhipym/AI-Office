@@ -3,14 +3,14 @@
 from .base import BaseAgent, AgentResponse, extract_code_blocks
 from .prompts import CHATGPT_PROMPT
 from services.openai_client import chat_completion, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 class ChatGPTAgent(BaseAgent):
     id = "chatgpt"
     name = "ChatGPT"
     role = "분석가 - 문서 / 분석 / 교육"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = CHATGPT_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

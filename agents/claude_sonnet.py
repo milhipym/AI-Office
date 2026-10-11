@@ -3,14 +3,14 @@
 from .base import BaseAgent, AgentResponse, extract_code_blocks
 from .prompts import CLAUDE_SONNET_PROMPT
 from services.openai_client import chat_completion, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 class ClaudeSonnetAgent(BaseAgent):
     id = "sonnet"
     name = "Claude Sonnet"
     role = "개발자 - 코드 생성"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = CLAUDE_SONNET_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

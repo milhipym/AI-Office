@@ -3,14 +3,14 @@
 from .base import BaseAgent, AgentResponse, extract_code_blocks
 from .prompts import CLAUDE_OPUS_PROMPT
 from services.openai_client import chat_completion, OpenAIError
-from config import is_openai_configured
+from config import OPENAI_MODEL, is_openai_configured
 
 
 class ClaudeOpusAgent(BaseAgent):
     id = "claude"
     name = "Claude Opus"
     role = "CTO - 아키텍처 설계"
-    model = "gpt-4o"
+    model = OPENAI_MODEL
     system_prompt = CLAUDE_OPUS_PROMPT
 
     def execute(self, message: str, history=None) -> AgentResponse:

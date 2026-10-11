@@ -6,6 +6,7 @@ from .manus import ManusAgent
 from .gemini import GeminiAgent
 from .chatgpt import ChatGPTAgent
 from .perplexity import PerplexityAgent
+from .brain_agents import ArchivistAgent, MinutesAgent, FinderAgent, ReporterAgent, CoachAgent
 
 AGENTS = {
     "claude": ClaudeOpusAgent(),
@@ -17,6 +18,12 @@ AGENTS = {
     "gpt": ChatGPTAgent(),  # alias
     "perplexity": PerplexityAgent(),
     "ppl": PerplexityAgent(),  # alias
+    # Second brain
+    "archivist": ArchivistAgent(),
+    "minutes": MinutesAgent(),
+    "finder": FinderAgent(),
+    "reporter": ReporterAgent(),
+    "coach": CoachAgent(),
 }
 
 __all__ = ["AGENTS"]
