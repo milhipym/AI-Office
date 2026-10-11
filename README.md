@@ -25,7 +25,7 @@
 | 성과 코치 | `/성과` | 기간 기록 → STAR 성과, 이력서·자기평가 문장, 보완점 (기록 5건 이상) | `/성과 올해 상반기` |
 
 ### 화면
-- **사무실**: 팀별 방(안내데스크 · 기록실 · 회의실 · 자료·보고실 · 콘텐츠 스튜디오[준비 중])에 직원이 앉아 있고, 일을 맡으면 작업 중으로 바뀌며 말풍선으로 결과를 보여줍니다. 직원을 클릭하면 모델 · 명령 · 예시와 "업무 지시하기" 버튼.
+- **사무실 (3D)**: 복셀 스타일 3D 사무실. 팀별 방(안내데스크 · 기록실 · 회의실 · 자료·보고실 · 콘텐츠 스튜디오[준비 중])에 직원이 앉아 있고, 일을 맡으면 타이핑하며 말풍선으로 결과를 보여줍니다. 드래그로 회전, 휠/핀치로 확대. 직원을 클릭하면 모델 · 명령 · 예시와 "업무 지시하기" 버튼. **2D 보기**로 전환 가능하며, 3D를 쓸 수 없으면 자동으로 2D로 표시됩니다.
 - **팀 채팅**: 지시와 응답. `/`를 입력하면 명령 목록이 뜹니다.
 - **세컨브레인**: 저장된 기록·회의록 목록, 분류/종류 필터, 삭제, 주간 보고·성과 정리 바로가기.
 - **조직도**: 팀과 직원, 준비 중인 팀.
@@ -74,16 +74,100 @@
 
 명령어 자동완성, 접수 매니저의 분류, 사무실 배치, 조직도는 자동으로 반영됩니다. `tests/test_roster.py`가 명령 중복 · 좌석 겹침 · 미등록 직원을 검사합니다.
 
-## 실행 방법
+## 내 노트북에서 실행하기
 
+### 실행 전에 확인할 점
+- **Python 3.9 이상** (3.10+ 권장). 3.8 이하에서는 실행 즉시 오류가 납니다.
+- **Mac은 5000번 포트를 AirPlay 수신기가 사용**합니다. 아래 4단계에서 `FLASK_PORT=5050`으로 바꾸세요.
+- **인터넷 연결 필요**: 화면 라이브러리(마크다운 렌더링, 3D)를 CDN에서 받습니다. 3D 라이브러리를 못 받으면 사무실은 자동으로 2D로 표시됩니다.
+
+### 1. Python 확인
+```bash
+python3 --version      # Mac
+python --version       # Windows
+```
+없거나 3.9 미만이면 python.org에서 설치하세요. Windows는 설치 화면에서 **"Add Python to PATH"** 체크.
+
+### 2. 코드 받기
+```bash
+git clone https://github.com/milhipym/AI-Office.git
+cd AI-Office
+git checkout ccr-61aa7d3b-vs0161   # PR 머지 전에만 필요. 머지 후에는 생략
+```
+비공개 저장소라면 비밀번호 자리에 GitHub Personal Access Token을 입력합니다.
+
+### 3. 가상환경 + 패키지 설치
+**Mac**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+**Windows (PowerShell)**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+"스크립트를 실행할 수 없습니다" 오류가 나면 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`를 한 번 실행한 뒤 다시 활성화하세요.
+
+### 4. API 키 · 모델 설정
+```bash
+cp .env.example .env       # Mac
+copy .env.example .env     # Windows
+```
+`.env`를 열어 수정합니다.
+```
+OPENAI_API_KEY=sk-proj-...          # platform.openai.com > API keys
+FLASK_PORT=5050                     # Mac은 5000번 충돌 회피
+
+# 직원별 모델 (비워두면 기본값). 정확한 모델 ID는 OpenAI 모델 페이지에서 복사
+OPENAI_MODEL=...                    # 업무 비서
+MODEL_CLASSIFIER=...                # 접수 매니저 — 저가·고속 모델
+MODEL_ARCHIVIST=...                 # 기록관 — 저가 모델
+MODEL_MINUTES=...                   # 회의록 서기
+MODEL_FINDER=...                    # 자료 사서
+MODEL_REPORTER=...                  # 주간보고 담당
+MODEL_COACH=...                     # 성과 코치
+EMBEDDING_MODEL=text-embedding-3-small   # 한번 정하면 바꾸지 않기
+```
+OpenAI 계정에 결제 수단이 등록되어 있어야 키가 동작합니다. **Billing에서 월 사용 한도(예: $10)를 걸어두기**를 권장합니다.
+
+### 5. 실행
+```bash
+python app.py        # 가상환경이 켜진 상태에서
+```
+브라우저에서 **http://localhost:5050** (포트를 안 바꿨으면 5000).
+
+다음부터는:
 ```bash
 cd AI-Office
-pip install -r requirements.txt
-cp .env.example .env        # OPENAI_API_KEY 입력
+source .venv/bin/activate     # Windows: .venv\Scripts\Activate.ps1
 python app.py
 ```
 
-브라우저에서 `http://localhost:5000` 접속. API 키 없이도 실행은 되며, 직원들이 "미설정" 안내를 반환합니다.
+### 6. 처음 써볼 것
+1. 상단 배지가 **🟢 OpenAI 연결됨**인지 확인
+2. 팀 채팅에 `/기록 오늘 OO 회의 참석, 배포 일정 확정` → 사무실에서 기록관이 일하고 말풍선으로 결과를 보여줌
+3. 명령 없이 `어제 장애 대응했음` → 접수 매니저가 기록관에게 배정하는지 확인
+4. 회의는 `/회의 제목` + Shift+Enter로 메모를 이어 쓴 뒤 Enter
+5. 며칠 쌓이면 `/찾기`, `/주간` (`/성과`는 기록 5건 이상부터)
+
+### 7. 백업 · 업데이트
+- 기록은 **`data/brain.db` 파일 하나**에 저장됩니다. 이 파일만 복사하면 백업 끝 (git에는 올라가지 않음).
+- 업데이트: `git pull` 후 `pip install -r requirements.txt`. 기존 기록은 유지됩니다.
+
+### 문제 해결
+| 증상 | 원인 / 조치 |
+|---|---|
+| 접속 시 403 또는 다른 화면 (Mac) | AirPlay가 5000번 사용 중 → `.env`에 `FLASK_PORT=5050` |
+| 배지가 "OPENAI_API_KEY 미설정" | `.env`가 `AI-Office` 폴더 바로 아래 있는지, 키가 `sk-`로 시작하는지 확인 후 서버 재시작 |
+| 응답에 `**`, `##` 같은 기호가 그대로 보임 | 마크다운 라이브러리(cdnjs) 로드 실패 → 회사망·보안 프로그램 확인 |
+| 사무실이 3D가 아니라 2D로 나옴 | 3D 라이브러리(jsdelivr) 로드 실패 또는 WebGL 미지원 → 네트워크 확인, 크롬/엣지 최신 버전 사용 |
+| 3D가 버벅이거나 배터리를 많이 씀 | 사무실 탭의 **🗺️ 2D로 보기** (선택은 브라우저에 기억됨) |
+| "model not found" | `.env`의 모델 ID 오타 → OpenAI 모델 페이지에서 그대로 복사 |
+| `ModuleNotFoundError: flask` | 가상환경이 꺼져 있음 → `activate` 먼저 |
+| 세컨브레인 탭에 "⚠️ 검색 인덱스 갱신 필요" | 버튼을 한 번 누르면 해결 |
 
 > 기본값은 `127.0.0.1` 바인딩 + 디버그 off 입니다. 디버그 모드(`FLASK_DEBUG=true`)는 Werkzeug 디버거를 통해 원격 코드 실행이 가능하므로 외부에 노출된 상태로 켜지 마세요.
 
@@ -113,7 +197,10 @@ AI-Office/
 │   ├── brain_store.py      # 기록 SQLite 저장소
 │   └── storage.py          # 채팅 로그 (data/chat_history.json)
 ├── templates/index.html
-├── static/                 # css, js
+├── static/
+│   ├── js/app.js           # 화면 전체 (탭, 채팅, 2D 사무실, 세컨브레인)
+│   ├── js/office3d.js      # 3D 사무실 (three.js, CDN 실패 시 2D로 대체)
+│   └── css/style.css
 └── tests/                  # pytest
 ```
 

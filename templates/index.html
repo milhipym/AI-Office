@@ -13,6 +13,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+    <!-- 3D office (falls back to the 2D grid if this fails to load) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="/static/js/office3d.js"
+            onerror="window.office3dFailed = true; window.dispatchEvent(new Event('office3d-failed'))"></script>
 </head>
 <body>
     <!-- Header -->
@@ -55,7 +66,13 @@
 
         <!-- ===== OFFICE VIEW ===== -->
         <section id="tab-office" class="tab-content active">
+            <div class="office-toolbar">
+                <button class="brain-btn" id="viewToggle">🗺️ 2D로 보기</button>
+                <button class="brain-btn" id="resetView">🎯 시점 초기화</button>
+                <span class="office-hint" id="officeHint"></span>
+            </div>
             <div class="office-container">
+                <div class="office3d-stage" id="office3d" hidden></div>
                 <div class="office-grid" id="officeGrid">
                     <!-- Rooms will be rendered here -->
                 </div>

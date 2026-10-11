@@ -109,6 +109,7 @@ async function loadData() {
         renderOrgChart();
         renderCustomize();
         initChatInput();
+        initOfficeView();
         initBrain();
         loadEntries();
         startAgentAnimations();
@@ -164,6 +165,10 @@ function sizeGrid(grid) {
 }
 
 function renderOffice() {
+    if (state.officeView === '3d' && state.office3d) {
+        state.office3d.update();
+        return;
+    }
     const grid = document.getElementById('officeGrid');
     grid.innerHTML = '';
     sizeGrid(grid);
@@ -230,6 +235,80 @@ function renderAgentsOnGrid(grid) {
         cell.style.overflow = 'visible';
         cell.style.zIndex = '10';
     });
+}
+
+// ===== OFFICE VIEW MODE (3D / 2D) =====
+// 3D is the default; the 2D grid stays as the fallback when WebGL or the
+// three.js CDN is unavailable, and as a lighter option.
+function preferredView() {
+    try {
+        return localStorage.getItem('officeView') || '3d';
+    } catch (e) {
+        return '3d';
+    }
+}
+
+function whenOffice3D(timeoutMs = 8000) {
+    return new Promise(resolve => {
+        if (window.Office3D) return resolve(window.Office3D);
+        if (window.office3dFailed) return resolve(null);
+        const done = value => {
+            clearTimeout(timer);
+            resolve(value);
+        };
+        const timer = setTimeout(() => done(null), timeoutMs);
+        window.addEventListener('office3d-ready', () => done(window.Office3D), { once: true });
+        // Fired by the module script tag when three.js can't be fetched.
+        window.addEventListener('office3d-failed', () => done(null), { once: true });
+    });
+}
+
+async function setOfficeView(mode) {
+    const grid = document.getElementById('officeGrid');
+    const stage = document.getElementById('office3d');
+
+    if (mode === '3d') {
+        const lib = await whenOffice3D();
+        if (!lib || !lib.supported) {
+            showToast('3D 화면을 불러오지 못해 2D로 표시합니다');
+            mode = '2d';
+        } else if (!state.office3d) {
+            stage.hidden = false;
+            try {
+                state.office3d = lib.mount(stage, {
+                    getState: () => state,
+                    onAgentClick: id => showAgentInfo(state.agents.find(a => a.id === id)),
+                    escapeHtml,
+                });
+            } catch (err) {
+                console.error('3D office failed:', err);
+                showToast('3D 화면 오류로 2D로 표시합니다');
+                mode = '2d';
+            }
+        }
+    }
+
+    stage.hidden = mode !== '3d';
+    grid.hidden = mode === '3d';
+    state.officeView = mode;
+    renderOffice();
+    document.getElementById('viewToggle').textContent = mode === '3d' ? '🗺️ 2D로 보기' : '🧊 3D로 보기';
+    document.getElementById('resetView').hidden = mode !== '3d';
+    document.getElementById('officeHint').textContent = mode === '3d'
+        ? '드래그: 회전 · 휠/핀치: 확대 · 직원 클릭: 정보'
+        : '직원 클릭: 정보';
+}
+
+function initOfficeView() {
+    document.getElementById('viewToggle').addEventListener('click', () => {
+        const next = state.officeView === '3d' ? '2d' : '3d';
+        try {
+            localStorage.setItem('officeView', next);
+        } catch (e) { /* preference is optional */ }
+        setOfficeView(next);
+    });
+    document.getElementById('resetView').addEventListener('click', () => state.office3d?.resetView());
+    setOfficeView(preferredView());
 }
 
 // Show what an agent is doing in the office, the status bar and the chat sidebar.
