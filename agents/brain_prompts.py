@@ -8,16 +8,16 @@ from config import BRAIN_CATEGORIES
 
 
 def classifier_prompt() -> str:
-    return """사용자 메시지의 의도를 하나로 분류하세요. JSON으로만 답합니다: {"intent": "<값>"}
+    """Built from the roster so a new team's intent is classified automatically."""
+    from .roster import STAFF
 
-- "log": 자신이 한 일/겪은 일/생각을 기록하려는 서술 (예: "오늘 결제 장애 대응함", "A팀이랑 일정 조율 완료")
-- "meeting": 회의 내용/회의 메모를 정리해 달라는 것, 또는 참석자·결정사항·액션아이템이 담긴 회의 메모 원문
-- "search": 과거에 기록한 내용을 찾거나 물어보는 것 (예: "지난달 장애 몇 번 있었지?", "B업체 협의 내용 찾아줘")
-- "weekly": 주간 보고/주간 업무 정리를 만들어 달라는 것
-- "career": 성과 정리, 커리어 정리, 이력서·자기평가용 정리를 요청하는 것
-- "other": 위에 해당하지 않는 일반 질문/작업 요청 (코드 작성, 이미지, 웹 검색, 기획 등)
-
-애매하면: 과거형 업무 서술은 "log", "~했지?/~찾아줘"는 "search"."""
+    lines = [f'- "{s["intent"]["key"]}": {s["intent"]["desc"]}' for s in STAFF if s["intent"]]
+    lines.append('- "other": 위에 해당하지 않는 일반 질문/작업 요청 (메일 초안, 설명 요청, 잡담 등)')
+    return (
+        '사용자 메시지의 의도를 하나로 분류하세요. JSON으로만 답합니다: {"intent": "<값>"}\n\n'
+        + "\n".join(lines)
+        + '\n\n애매하면: 과거형 업무 서술은 "log", "~했지?/~찾아줘"는 "search".'
+    )
 
 
 def archivist_prompt(today: str, weekday: str) -> str:

@@ -189,17 +189,17 @@ body {
 }
 
 .office-grid {
-    flex: 1;
+    flex: 0 1 auto;
+    /* Bound the width by the height left on screen so the whole office fits. */
+    width: min(100%, calc((100vh - 250px) * var(--grid-cols, 9) / var(--grid-rows, 6)));
+    min-width: 0;
+    margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(7, 1fr);
     gap: 1px;
     background: var(--bg-secondary);
     border: 3px solid var(--border-color);
     border-radius: 4px;
-    min-height: 500px;
     position: relative;
-    overflow: hidden;
 }
 
 .grid-cell {
@@ -229,11 +229,19 @@ body {
 }
 
 /* Room colors */
-.grid-cell.room-main { background: #e8e0d0; }
-.grid-cell.room-meeting { background: #d8d0e8; }
-.grid-cell.room-content { background: #d0e8d8; }
-.grid-cell.room-dev { background: #d8e8f0; }
-.grid-cell.hallway { background: #b8b8c8; }
+:is(.grid-cell, .customize-cell).room-lobby { background-color: #e8e0d0; }
+:is(.grid-cell, .customize-cell).room-records { background-color: #d0e8e4; }
+:is(.grid-cell, .customize-cell).room-meeting { background-color: #d8d0e8; }
+:is(.grid-cell, .customize-cell).room-library { background-color: #f0e2d0; }
+:is(.grid-cell, .customize-cell).room-studio { background-color: #f0d8e6; }
+:is(.grid-cell, .customize-cell).hallway { background-color: #b8b8c8; }
+
+/* A room reserved for a team that hasn't been hired yet */
+.grid-cell.planned,
+.customize-cell.planned {
+    background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 6px, transparent 6px 12px);
+    filter: saturate(0.6);
+}
 
 /* Room labels */
 .room-label {
@@ -1228,10 +1236,10 @@ body {
 }
 
 .customize-grid {
-    flex: 1;
+    flex: 0 1 auto;
+    width: min(100%, calc((100vh - 230px) * var(--grid-cols, 9) / var(--grid-rows, 6)));
+    margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(7, 1fr);
     gap: 2px;
     background: var(--bg-secondary);
     border: 3px solid var(--border-color);
@@ -1257,8 +1265,8 @@ body {
 }
 
 .customize-cell.has-item {
-    background: rgba(16, 185, 129, 0.1);
     border-color: var(--accent-green);
+    box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.5);
 }
 
 .placed-item {
@@ -1986,5 +1994,108 @@ textarea.chat-input {
 
     .brain-models {
         margin-left: 0;
+    }
+}
+
+/* ===== OFFICE ACTIVITY ===== */
+.grid-cell .furniture {
+    font-size: clamp(14px, 2vw, 22px);
+    opacity: 0.85;
+}
+
+.speech-bubble {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 180px;
+    background: #fff;
+    color: #222;
+    font-size: 10px;
+    line-height: 1.35;
+    padding: 4px 7px;
+    border: 2px solid #333;
+    border-radius: 6px;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+    z-index: 30;
+    pointer-events: none;
+}
+
+.speech-bubble span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #333;
+}
+
+.pixel-agent.working-anim .agent-body {
+    animation: typing 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes typing {
+    from { transform: translateY(0); }
+    to { transform: translateY(-3px); }
+}
+
+.agent-detail-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.agent-detail-meta code {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.agent-detail-example {
+    font-style: italic;
+}
+
+.assign-btn {
+    width: 100%;
+}
+
+.org-team-card.planned {
+    border-style: dashed;
+    opacity: 0.7;
+}
+
+.planned-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-pink);
+    border: 1px solid var(--accent-pink);
+    border-radius: 3px;
+    padding: 0 4px;
+    margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+    .office-grid {
+        width: 100%;
+    }
+
+    .speech-bubble {
+        max-width: 90px;
+        font-size: 9px;
+    }
+
+    .room-label {
+        font-size: 7px;
     }
 }

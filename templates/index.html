@@ -22,7 +22,7 @@
                 <span class="logo-icon">&#9632;&#9632;&#9632;</span>
                 <span class="logo-text">AI OFFICE</span>
             </div>
-            <span class="header-subtitle">월급 0원으로 직원 <span class="agent-count">11</span>명 운영 중</span>
+            <span class="header-subtitle">나만의 세컨브레인 오피스 · 직원 <span class="agent-count">7</span>명</span>
             <span class="api-badge" id="apiBadge" title="OpenAI API 상태">API 확인 중...</span>
         </div>
         <nav class="nav-tabs">
@@ -45,7 +45,7 @@
         <div class="header-right">
             <div class="status-indicator">
                 <span class="status-dot online"></span>
-                <span>직원 <span class="agent-count">11</span>명 근무 중</span>
+                <span>직원 <span class="agent-count">7</span>명 근무 중</span>
             </div>
         </div>
     </header>
@@ -88,7 +88,7 @@
                 <div class="chat-main">
                     <div class="chat-header-bar">
                         <span class="chat-room-name"># 전체 채널</span>
-                        <span class="chat-room-desc">AI 직원들의 업무 소통 채널</span>
+                        <span class="chat-room-desc">지시를 남기면 담당 직원이 처리합니다</span>
                     </div>
                     <div class="chat-messages" id="chatMessages">
                         <!-- Messages -->
@@ -101,7 +101,7 @@
                             </button>
                         </div>
                         <div id="mentionDropdown" class="mention-dropdown"></div>
-                        <p class="chat-hint">🧠 /기록 · /회의 · /찾기 · /주간 · /성과 &nbsp;|&nbsp; 💡 @sonnet · @opus · @manus · @gemini · @chatgpt · @perplexity &nbsp;|&nbsp; 명령 없이 보내면 의도를 자동 분류</p>
+                        <p class="chat-hint">⌨️ /기록 · /회의 · /찾기 · /주간 · /성과 · /비서 &nbsp;|&nbsp; 🛎️ 명령 없이 보내면 접수 매니저가 담당자에게 배정</p>
                     </div>
                 </div>
             </div>
@@ -132,8 +132,8 @@
         <!-- ===== ORG CHART VIEW ===== -->
         <section id="tab-org" class="tab-content">
             <div class="org-container">
-                <h2 class="org-title">AI Organization Blueprint v2.1</h2>
-                <p class="org-subtitle">내맘대로 조직도 구성</p>
+                <h2 class="org-title">AI Office Org Chart</h2>
+                <p class="org-subtitle">대표 → 접수 매니저 → 팀 · 새 팀은 agents/roster.py에 추가</p>
                 <div class="org-chart" id="orgChart">
                     <!-- Org chart rendered by JS -->
                 </div>

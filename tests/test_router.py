@@ -27,28 +27,21 @@ def test_requests_are_not_smalltalk(message):
     ("/찾기 지난달 장애", "finder", "지난달 장애"),
     ("/주간", "reporter", ""),
     ("/성과 올해", "coach", "올해"),
+    ("/비서 메일 초안", "assistant", "메일 초안"),
     ("/LOG english alias", "archivist", "english alias"),
 ])
 def test_slash_commands(message, agent_id, text):
-    agent, cleaned = router.dispatch(message, classify=False)
+    agent, cleaned, routed_by = router.dispatch(message, classify=False)
     assert agent.id == agent_id
     assert cleaned == text
+    assert routed_by == "command"
 
 
-def test_mention_still_routes():
-    agent, cleaned = router.dispatch("@sonnet 로그인 API", classify=False)
-    assert agent.id == "sonnet"
-    assert cleaned == "로그인 API"
-
-
-@pytest.mark.parametrize("message,agent_id", [
-    ("2026 로드맵 짜줘", "manus"),
-    ("decode 방식 설명해줘", "manus"),
-    ("보고서 작성해줘", "chatgpt"),
-    ("bug fix 해줘", "sonnet"),
-])
-def test_keyword_fallback(message, agent_id):
-    assert router.route(message).id == agent_id
+def test_unknown_command_goes_to_assistant():
+    agent, cleaned, routed_by = router.dispatch("/없는명령 내용", classify=False)
+    assert agent.id == "assistant"
+    assert cleaned == "/없는명령 내용"
+    assert routed_by == "fallback"
 
 
 def _fake_classifier(monkeypatch, intent):
@@ -59,25 +52,33 @@ def _fake_classifier(monkeypatch, intent):
     )
 
 
-def test_classifier_routes_plain_text(monkeypatch):
-    _fake_classifier(monkeypatch, "log")
-    agent, cleaned = router.dispatch("오늘 장애 대응 회의했음")
-    assert agent.id == "archivist"
+@pytest.mark.parametrize("intent,agent_id", [
+    ("log", "archivist"), ("meeting", "minutes"), ("search", "finder"),
+    ("weekly", "reporter"), ("career", "coach"),
+])
+def test_classifier_routes_plain_text(monkeypatch, intent, agent_id):
+    _fake_classifier(monkeypatch, intent)
+    agent, cleaned, routed_by = router.dispatch("오늘 장애 대응 회의했음")
+    assert agent.id == agent_id
     assert cleaned == "오늘 장애 대응 회의했음"
+    assert routed_by == "classifier"
 
 
-def test_classifier_other_falls_back_to_keywords(monkeypatch):
-    _fake_classifier(monkeypatch, "other")
-    agent, _ = router.dispatch("로고 이미지 그려줘")
-    assert agent.id == "gemini"
+@pytest.mark.parametrize("intent", ["other", "nonsense", ""])
+def test_classifier_other_goes_to_assistant(monkeypatch, intent):
+    _fake_classifier(monkeypatch, intent)
+    agent, _, routed_by = router.dispatch("메일 초안 써줘")
+    assert agent.id == "assistant"
+    assert routed_by == "fallback"
 
 
-def test_classifier_failure_falls_back(monkeypatch):
+def test_classifier_failure_goes_to_assistant(monkeypatch):
     monkeypatch.setattr(config, "is_openai_configured", lambda: True)
 
     def boom(*a, **k):
         raise openai_client.OpenAIError("down")
 
     monkeypatch.setattr(openai_client, "json_completion", boom)
-    agent, _ = router.dispatch("아키텍처 리뷰해줘")
-    assert agent.id == "claude"
+    agent, _, routed_by = router.dispatch("아키텍처 리뷰해줘")
+    assert agent.id == "assistant"
+    assert routed_by == "fallback"

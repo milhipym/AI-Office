@@ -1,11 +1,16 @@
-"""Task router — decides which agent should handle a given message."""
+"""Task router — decides which staff member handles a message.
+
+Commands and classifier intents come from agents/roster.py, so a new team is
+routable as soon as it has a roster entry and a registered agent.
+"""
 
 import re
 from typing import Optional
 
 from . import AGENTS
-from .base import BaseAgent
+from .roster import commands, intents
 
+FALLBACK_AGENT = "assistant"
 
 # Simple greetings / small talk — we bypass the LLM for these.
 # Each pattern must match the WHOLE message (after trailing punctuation is
@@ -30,39 +35,20 @@ def is_smalltalk(message: str) -> bool:
     m = message.strip().lower()
     if not m or len(m) > 25 or m.startswith("/"):
         return False
-    # Strip leading @mention so "@sonnet 안녕" is still caught
-    m_clean = re.sub(r"^@\w+\s*", "", m).strip()
-    m_clean = re.sub(r"[\W_]+$", "", m_clean)
-    if not m_clean or len(m_clean) > 20:
+    m = re.sub(r"[\W_]+$", "", m)
+    if not m or len(m) > 20:
         return False
-    return any(re.fullmatch(p, m_clean, re.IGNORECASE) for p in SMALLTALK_PATTERNS)
+    return any(re.fullmatch(p, m, re.IGNORECASE) for p in SMALLTALK_PATTERNS)
 
 
-# Slash commands for the second brain. Explicit commands are the reliable path;
-# the LLM classifier below only handles messages without one.
-COMMANDS = {
-    "기록": "archivist", "log": "archivist",
-    "회의": "minutes", "회의록": "minutes", "meeting": "minutes",
-    "찾기": "finder", "검색": "finder", "find": "finder",
-    "주간": "reporter", "주간보고": "reporter", "weekly": "reporter",
-    "성과": "coach", "커리어": "coach", "career": "coach",
-}
-COMMAND_RE = re.compile(r"^/(\S+)\s*", re.IGNORECASE)
-
-INTENT_TO_AGENT = {
-    "log": "archivist",
-    "meeting": "minutes",
-    "search": "finder",
-    "weekly": "reporter",
-    "career": "coach",
-}
+COMMAND_RE = re.compile(r"^/(\S+)\s*")
 
 
 def classify_intent(message: str) -> Optional[str]:
-    """Ask a cheap model whether this is a log / meeting / search / ... message.
+    """Ask the classifier model which staff member should get this message.
 
-    Returns an agent id, or None for "other" or when the call fails, in which
-    case the caller falls back to keyword routing.
+    Returns a staff id, or None for "other" or when the call fails; the
+    caller then hands the message to the general assistant.
     """
     from config import MODEL_CLASSIFIER, is_openai_configured
     from services.openai_client import OpenAIError, json_completion
@@ -74,120 +60,26 @@ def classify_intent(message: str) -> Optional[str]:
         result = json_completion(classifier_prompt(), message[:2000], model=MODEL_CLASSIFIER)
     except OpenAIError:
         return None
-    return INTENT_TO_AGENT.get(str(result["data"].get("intent", "")).lower())
+    agent_id = intents().get(str(result["data"].get("intent", "")).lower())
+    return agent_id if agent_id in AGENTS else None
 
 
-# Keyword rules, evaluated in order. First match wins.
-KEYWORD_RULES = [
-    (
-        ["코드", "구현", "함수", "버그", "리팩토", "디버그", "API 만들",
-         "스크립트", "컴포넌트", "엔드포인트",
-         "code", "implement", "function", "bug", "refactor"],
-        "sonnet",
-    ),
-    (
-        ["아키텍처", "설계", "기술 선택", "기술 스택", "ADR",
-         "시스템 구조", "마이크로서비스", "모놀리스", "인프라 설계",
-         "architecture", "design pattern", "tech stack"],
-        "claude",
-    ),
-    (
-        ["검색", "최신", "트렌드", "뉴스", "실시간",
-         "search", "latest", "news", "trend"],
-        "perplexity",
-    ),
-    (
-        ["이미지", "그림", "로고", "썸네일", "일러스트", "포스터",
-         "배너", "아이콘", "디자인", "그려줘",
-         "image", "logo", "illustration", "banner"],
-        "gemini",
-    ),
-    (
-        ["분석", "보고서", "리포트", "커리큘럼", "교안", "강의",
-         "시장", "통계", "SWOT", "데이터 분석",
-         "analysis", "report", "curriculum"],
-        "chatgpt",
-    ),
-    (
-        ["기획", "로드맵", "태스크", "일정", "계획", "스케줄",
-         "마일스톤", "프로젝트", "목표", "전략",
-         "plan", "roadmap", "milestone", "strategy"],
-        "manus",
-    ),
-]
-
-
-MENTION_RE = re.compile(r"^@(\w+)\s*", re.IGNORECASE)
-
-CHANNEL_DEFAULTS = {
-    "dev": "sonnet",
-    "content": "gemini",
-    "research": "perplexity",
-    "academy": "chatgpt",
-    "meeting": "claude",
-}
-
-
-def route(message: str, channel: Optional[str] = None) -> BaseAgent:
-    """Return the agent that should handle this message.
-
-    Priority:
-    1. Explicit mention (`@sonnet ...`)
-    2. Channel default
-    3. Keyword matching
-    4. Fallback to Manus (PM)
-    """
-    # 1. Explicit mention
-    match = MENTION_RE.match(message.strip())
-    if match:
-        mention = match.group(1).lower()
-        if mention in AGENTS:
-            return AGENTS[mention]
-
-    # 2. Channel default
-    if channel and channel in CHANNEL_DEFAULTS:
-        return AGENTS[CHANNEL_DEFAULTS[channel]]
-
-    # 3. Keyword rules
-    lower_message = message.lower()
-    for keywords, agent_id in KEYWORD_RULES:
-        if any(_keyword_hit(kw, lower_message) for kw in keywords):
-            return AGENTS[agent_id]
-
-    # 4. Default: Manus
-    return AGENTS["manus"]
-
-
-def _keyword_hit(keyword: str, lower_message: str) -> bool:
-    kw = keyword.lower()
-    if kw.isascii():
-        # Whole words only, so "code" doesn't match "decode".
-        return re.search(rf"\b{re.escape(kw)}\b", lower_message) is not None
-    return kw in lower_message
-
-
-def strip_mention(message: str) -> str:
-    """Remove the leading @mention from a message so the agent doesn't see it."""
-    return MENTION_RE.sub("", message.strip(), count=1)
-
-
-def dispatch(message: str, channel: Optional[str] = None, classify: bool = True) -> tuple:
+def dispatch(message: str, classify: bool = True) -> tuple:
     """Pick the agent and the text it should see.
 
-    Priority: /command → @mention → channel default → intent classifier →
-    keyword rules → Manus.
+    Returns (agent, text, routed_by) where routed_by is "command",
+    "classifier" or "fallback".
     """
     text = message.strip()
     cmd = COMMAND_RE.match(text)
-    if cmd and cmd.group(1).lower() in COMMANDS:
-        return AGENTS[COMMANDS[cmd.group(1).lower()]], text[cmd.end():].strip()
-
-    if MENTION_RE.match(text) or (channel and channel in CHANNEL_DEFAULTS):
-        return route(text, channel=channel), strip_mention(text)
+    if cmd:
+        agent_id = commands().get(cmd.group(1).lower())
+        if agent_id in AGENTS:
+            return AGENTS[agent_id], text[cmd.end():].strip(), "command"
 
     if classify:
         agent_id = classify_intent(text)
         if agent_id:
-            return AGENTS[agent_id], text
+            return AGENTS[agent_id], text, "classifier"
 
-    return route(text, channel=channel), text
+    return AGENTS[FALLBACK_AGENT], text, "fallback"

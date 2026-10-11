@@ -129,3 +129,14 @@ def test_unconfigured_api(monkeypatch):
     monkeypatch.setattr(brain_agents, "is_openai_configured", lambda: False)
     resp = ArchivistAgent().execute("기록")
     assert "OPENAI_API_KEY" in resp.text
+
+
+def test_assistant_only_sees_its_own_exchanges():
+    from agents.assistant import own_history
+    history = [
+        {"agent": "user", "message": "/기록 배포"},
+        {"agent": "archivist", "message": "1건 기록"},
+        {"agent": "user", "message": "메일 써줘"},
+        {"agent": "assistant", "message": "초안입니다"},
+    ]
+    assert own_history(history) == history[2:]
