@@ -691,8 +691,9 @@ function guessAgent(message) {
 // ===== SECOND BRAIN =====
 async function loadEntries() {
     try {
-        const res = await fetch('/api/entries');
-        state.entries = await res.json();
+        const [entriesRes, metaRes] = await Promise.all([fetch('/api/entries'), fetch('/api/brain/meta')]);
+        state.entries = await entriesRes.json();
+        state.brainMeta = await metaRes.json();
         renderBrain();
     } catch (err) {
         console.error('Failed to load entries:', err);
@@ -712,6 +713,20 @@ function initBrain() {
     });
     document.querySelectorAll('.brain-btn[data-command]').forEach(btn => {
         btn.addEventListener('click', () => runCommandInChat(btn.dataset.command));
+    });
+    document.getElementById('brainStats').addEventListener('click', async (e) => {
+        const btn = e.target.closest('#reembedBtn');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.textContent = '검색 인덱스 갱신 중…';
+        try {
+            const res = await fetch('/api/brain/reembed', { method: 'POST' });
+            const data = await res.json();
+            showToast(res.ok ? `${data.updated}건 갱신 완료` : `갱신 실패: ${data.error}`);
+        } catch (err) {
+            showToast(`갱신 실패: ${err.message}`);
+        }
+        loadEntries();
     });
     document.getElementById('brainList').addEventListener('click', async (e) => {
         const btn = e.target.closest('.entry-delete');
@@ -756,8 +771,13 @@ function renderBrain() {
         <span>회의록 <b>${meetings}</b>건</span>
         <span>🏆 성과 후보 <b>${achievements}</b>건</span>
         <span>표시 중 <b>${filtered.length}</b>건</span>
+        ${state.brainMeta.stale_embeddings > 0 ? `
+            <button class="brain-btn warn" id="reembedBtn"
+                    title="임베딩이 없거나 다른 임베딩 모델로 만든 기록입니다. 갱신 전까지는 키워드로만 검색됩니다.">
+                ⚠️ 검색 인덱스 갱신 필요 ${state.brainMeta.stale_embeddings}건 · 갱신
+            </button>` : ''}
         <span class="brain-models" title="에이전트별 모델 (.env에서 변경)">
-            모델: 기록 ${escapeHtml(models.archivist || '')} · 검색 ${escapeHtml(models.finder || '')} · 보고 ${escapeHtml(models.reporter || '')} · 성과 ${escapeHtml(models.coach || '')}
+            모델: 기록 ${escapeHtml(models.archivist || '')} · 검색 ${escapeHtml(models.finder || '')} · 보고 ${escapeHtml(models.reporter || '')} · 성과 ${escapeHtml(models.coach || '')} · 임베딩 ${escapeHtml(models.embedding || '')}
         </span>
     `;
 

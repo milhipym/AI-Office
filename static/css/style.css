@@ -1837,6 +1837,22 @@ textarea.chat-input {
     background: var(--accent-blue);
 }
 
+.brain-btn.warn {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+    padding: 3px 10px;
+}
+
+.brain-btn.warn:hover {
+    background: var(--accent-orange);
+    color: var(--bg-primary);
+}
+
+.brain-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
 .brain-stats {
     display: flex;
     flex-wrap: wrap;

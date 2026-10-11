@@ -8,6 +8,7 @@ import re
 from datetime import date, timedelta
 
 from config import (
+    EMBEDDING_MODEL,
     MODEL_ARCHIVIST,
     MODEL_COACH,
     MODEL_FINDER,
@@ -127,6 +128,7 @@ class ArchivistAgent(BrainAgent):
                 tags=tags,
                 details=details,
                 embedding=_embed_one(embedding_text(title, summary, message, tags)),
+                embedding_model=EMBEDDING_MODEL,
             ))
 
         lines = [f"📥 **{len(saved)}건 기록했습니다.**", "", "| 날짜 | 분류 | 제목 | 태그 |", "|---|---|---|---|"]
@@ -195,6 +197,7 @@ class MinutesAgent(BrainAgent):
             tags=tags,
             details=details,
             embedding=_embed_one(embedding_text(title, summary, message, tags)),
+            embedding_model=EMBEDDING_MODEL,
         )
         return AgentResponse(
             text=render_minutes(entry),
@@ -230,6 +233,37 @@ TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 STOPWORDS = {"찾아줘", "찾아", "알려줘", "기록", "내용", "있었지", "있었나", "했지", "언제", "뭐였지", "관련", "대해", "지난주", "이번주", "지난달", "이번달", "오늘", "어제", "최근"}
 
 
+def _comparable(query_vec, entry: dict) -> bool:
+    """Vectors from another embedding model live in a different space: skip them."""
+    vec = entry.get("embedding")
+    return bool(
+        query_vec and vec
+        and entry.get("embedding_model") == EMBEDDING_MODEL
+        and len(vec) == len(query_vec)
+    )
+
+
+def reembed_stale(batch_size: int = 50) -> int:
+    """Re-embed every row whose vector is missing or from another model.
+
+    Returns the number of rows updated. Raises OpenAIError if the embedding
+    call fails, leaving already-updated rows in place.
+    """
+    updated = 0
+    while True:
+        batch = brain_store.list_stale(EMBEDDING_MODEL, limit=batch_size)
+        if not batch:
+            return updated
+        vectors = embed(
+            [embedding_text(e["title"], e["summary"], e["content"], e["tags"]) for e in batch]
+        )
+        if len(vectors) != len(batch):
+            raise OpenAIError("Embedding count did not match the request")
+        for entry, vec in zip(batch, vectors):
+            brain_store.set_embedding(entry["id"], vec, EMBEDDING_MODEL)
+        updated += len(batch)
+
+
 def rank_entries(query: str, entries: list, query_vec=None, top_k: int = SEARCH_TOP_K) -> list:
     """Rank entries by embedding similarity plus a keyword-overlap bonus."""
     tokens = [t for t in TOKEN_RE.findall(query.lower()) if t not in STOPWORDS]
@@ -238,7 +272,7 @@ def rank_entries(query: str, entries: list, query_vec=None, top_k: int = SEARCH_
         haystack = " ".join([e["title"], e["summary"], e["content"], " ".join(e["tags"])]).lower()
         hits = sum(1 for t in tokens if t in haystack)
         keyword = hits / len(tokens) if tokens else 0.0
-        semantic = brain_store.cosine(query_vec, e["embedding"]) if query_vec and e.get("embedding") else 0.0
+        semantic = brain_store.cosine(query_vec, e["embedding"]) if _comparable(query_vec, e) else 0.0
         score = semantic + 0.3 * keyword
         if score > 0:
             scored.append((score, e))

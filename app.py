@@ -12,9 +12,11 @@ from flask import Flask, jsonify, render_template, request
 
 import config
 from agents import roster
+from agents.brain_agents import reembed_stale
 from agents.router import dispatch, is_smalltalk
 from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
 from services import brain_store, storage
+from services.openai_client import OpenAIError
 
 # Canned smalltalk replies — avoid burning tokens on "안녕"
 SMALLTALK_REPLIES = [
@@ -163,7 +165,24 @@ def get_brain_meta():
             "coach": config.MODEL_COACH,
             "embedding": config.EMBEDDING_MODEL,
         },
+        # Records whose embedding is missing or from another model; search
+        # treats them as keyword-only until re-embedded.
+        "stale_embeddings": brain_store.count_stale(config.EMBEDDING_MODEL),
     })
+
+
+@app.route("/api/brain/reembed", methods=["POST"])
+def reembed():
+    if not is_openai_configured():
+        return jsonify({"error": "OPENAI_API_KEY 미설정"}), 400
+    try:
+        updated = reembed_stale()
+    except OpenAIError as e:
+        return jsonify({
+            "error": str(e),
+            "remaining": brain_store.count_stale(config.EMBEDDING_MODEL),
+        }), 502
+    return jsonify({"updated": updated, "remaining": brain_store.count_stale(config.EMBEDDING_MODEL)})
 
 
 @app.route("/api/furniture")

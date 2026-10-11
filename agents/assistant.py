@@ -42,7 +42,7 @@ class AssistantAgent(BaseAgent):
                 user_message=message,
                 history=own_history(history),
                 model=self.model,
-                temperature=0.5,
+                temperature=None,  # reasoning models reject temperature
             )
         except OpenAIError as e:
             return self.unavailable_response(str(e))
