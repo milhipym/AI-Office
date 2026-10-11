@@ -731,6 +731,26 @@ function setSending(on) {
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+async function postJSON(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+const agentName = id => state.agents.find(a => a.id === id)?.name || id;
+
+// Flow (the office acts it out as it happens):
+//   1. the task flies in to the dispatcher, or straight to the staff member a
+//      /command names;
+//   2. without a command, /api/route picks the staff member and the
+//      dispatcher walks the task over while /api/chat already runs;
+//   3. the staff member works (typing, or an errand to a shelf / whiteboard);
+//   4. the reply goes to the chat at once; in the office the bubble pops once
+//      the hand-over is done.
 async function sendMessage(message) {
     setSending(true);
     state.chatMessages.push({
@@ -740,56 +760,67 @@ async function sendMessage(message) {
         type: 'command',
     });
 
-    const guessed = guessAgent(message);
-    setAgentActivity(guessed, 'working', guessed === 'dispatcher' ? '담당자 찾는 중…' : '작업 중…');
-    state.office3d?.onSend(guessed);
-    state.chatMessages.push({
-        agent: guessed,
+    const viaDispatcher = guessAgent(message) === 'dispatcher';
+    let assignee = guessAgent(message);
+    setAgentActivity(assignee, 'working', viaDispatcher ? '담당자 찾는 중…' : '작업 중…');
+    state.office3d?.onSend(assignee);
+    const loading = {
+        agent: assignee,
         message: '_작업 중..._',
         time: new Date().toTimeString().slice(0, 5),
         type: 'system',
         _loading: true,
-    });
+    };
+    state.chatMessages.push(loading);
     renderChatMessages();
 
     try {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message }),
+        let preassigned = null;
+        let handedOver = Promise.resolve();
+        if (viaDispatcher) {
+            const routed = await postJSON('/api/route', { message });
+            if (routed.agent !== 'dispatcher') {
+                assignee = routed.agent;
+                preassigned = routed.agent;
+                const name = agentName(assignee);
+                setAgentActivity('dispatcher', 'working', `${name}에게 전달 중`);
+                loading.agent = assignee;
+                renderChatMessages();
+                handedOver = (state.office3d?.deliver('dispatcher', assignee) || Promise.resolve())
+                    .then(() => setAgentActivity('dispatcher', 'idle', `${name}에게 배정`));
+            }
+        }
+        // The staff member starts once the task is in their hands.
+        const started = handedOver.then(() => {
+            if (assignee === 'dispatcher') return;
+            setAgentActivity(assignee, 'working', '작업 중…');
+            state.office3d?.startErrand(assignee);
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
 
+        const data = await postJSON('/api/chat', preassigned ? { message, agent: preassigned } : { message });
         state.chatMessages = state.chatMessages.filter(m => !m._loading);
         state.chatMessages[state.chatMessages.length - 1] = data.user_message;
         state.chatMessages.push(data.ai_response);
         renderChatMessages();
 
         const ai = data.ai_response;
-        const agentName = state.agents.find(a => a.id === ai.agent)?.name || ai.agent;
-        if (guessed !== ai.agent) setAgentActivity(guessed, 'idle');
-        if (ai.metadata?.routed_by === 'classifier') {
-            setAgentActivity('dispatcher', 'idle', `${agentName}에게 배정`);
-            setAgentActivity(ai.agent, 'working');
-        }
-        // In the 3D office the hand-over flies first; the result pops when it
-        // lands. Capped so a hidden tab (animation paused) can't hold it up.
-        const landed = state.office3d?.onResponse({
+        // Capped so a hidden tab (animation paused) can't hold the result up.
+        await Promise.race([started, wait(10000)]);
+        if (ai.agent !== assignee) setAgentActivity(assignee, 'idle');
+        state.office3d?.onResponse({
             agent: ai.agent,
-            routedBy: ai.metadata?.routed_by,
             filed: !!ai.metadata?.brain_refresh,
             scheduled: !!ai.metadata?.calendar_refresh,
         });
-        if (landed) await Promise.race([landed, wait(4000)]);
         setAgentActivity(ai.agent, 'idle', bubbleSummary(ai.message));
-        showToast(`${agentName} 응답 완료`);
+        showToast(`${agentName(ai.agent)} 응답 완료`);
         if (ai.metadata?.brain_refresh) loadEntries();
         if (ai.metadata?.calendar_refresh) loadEvents();
     } catch (err) {
         console.error('Send failed:', err);
         state.chatMessages = state.chatMessages.filter(m => !m._loading);
-        setAgentActivity(guessed, 'idle', '전송 실패');
+        setAgentActivity(assignee, 'idle', '전송 실패');
+        if (assignee !== 'dispatcher') setAgentActivity('dispatcher', 'idle');
         state.chatMessages.push({
             agent: 'dispatcher',
             message: `메시지 전송 실패: ${err.message}`,

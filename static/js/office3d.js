@@ -28,6 +28,20 @@ const BASE_SLAB = 0xd5dbe5;
 const SKIN = 0xf1c27d;
 const STATUS_COLOR = { working: '#10b981', meeting: '#4a90d9', idle: '#a0a0b8' };
 
+// What each staff member physically does while working on a task:
+// [furniture to go to, nth nearest of that kind, action there, seconds].
+// Staff not listed stay at their desk and type.
+const ERRANDS = {
+    finder: [['bookshelf', 0, 'search', 1.6], ['bookshelf', 1, 'search', 1.4]],
+    coach: [['bookshelf', 0, 'search', 1.8]],
+    minutes: [['whiteboard', 0, 'write', 2.2]],
+    reporter: [['whiteboard', 0, 'write', 2.4]],
+};
+// Staff who carry their finished record to a bookshelf themselves.
+const FILERS = new Set(['archivist', 'minutes']);
+const WALK_SPEED = 1.8;  // world units per second
+const SUB = 0.5;         // navigation grid: half a floor tile
+
 const box = (w, h, d, color, opts = {}) => {
     const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
@@ -154,6 +168,14 @@ function cardboardBoxes() {
         g.add(at(box(s + 0.005, 0.02, 0.06, 0xa5844f), x, y + s / 2, z));  // tape
     }
     return g;
+}
+
+// Rotate `from` toward `to` by `k` of the shortest angular distance.
+function turnToward(from, to, k) {
+    let d = to - from;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return from + d * k;
 }
 
 function character(color) {
@@ -293,10 +315,34 @@ class Office3D {
                 }
             }
         }
+        // Doorway: the segment with no furniture on either side, nearest the
+        // middle, so people can actually walk through it. Walls and doors are
+        // recorded for path finding (keys: v<c>,<r> = between (c,r)|(c+1,r),
+        // h<c>,<r> = between (c,r)|(c,r+1)).
+        const placed = this.ctx.getState().placedItems || {};
+        const solid = (c, r) => { const t = placed[`${c},${r}`]; return !!t && t !== 'rug'; };
+        this.doors = new Set();
+        this.roomGrid = [];
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) this.roomGrid.push(roomAt(c, r)?.id ?? null);
+        }
         for (const segs of segments.values()) {
-            const door = Math.floor(segs.length / 2);
+            const mid = (segs.length - 1) / 2;
+            let door = 0;
+            let best = Infinity;
             segs.forEach((s, i) => {
-                if (i === door) return;
+                const blockedSides = solid(s.c, s.r) + (s.vertical ? solid(s.c + 1, s.r) : solid(s.c, s.r + 1));
+                const score = blockedSides * 10 + Math.abs(i - mid);
+                if (score < best) {
+                    best = score;
+                    door = i;
+                }
+            });
+            segs.forEach((s, i) => {
+                if (i === door) {
+                    this.doors.add(`${s.vertical ? 'v' : 'h'}${s.c},${s.r}`);
+                    return;
+                }
                 const [x, z] = this.cellCenter(s.c, s.r);
                 const wall = s.vertical
                     ? at(box(0.08, 0.45, 1, WALL), x + 0.5, 0.225, z)
@@ -343,7 +389,7 @@ class Office3D {
             // Someone sits here: push the furniture in front of them.
             const fz = seats.has(cell) ? z + 0.28 : z;
             this.furniture.add(at(make(), x, 0, fz));
-            this.spots.push({ type, x, z: fz });
+            this.spots.push({ type, x, z: fz, cell: [c, r], seat: seats.has(cell) });
         }
     }
 
@@ -379,7 +425,12 @@ class Office3D {
                 const [x, z] = this.cellCenter(agent.position.x, agent.position.y);
                 model.group.position.set(x, 0, z - 0.12);
                 this.scene.add(model.group);
-                entry = { ...model, label, seed: Math.random() * 10, key: '', color: agent.avatar_color };
+                entry = {
+                    ...model, label, seed: Math.random() * 10, key: '', color: agent.avatar_color,
+                    home: new THREE.Vector3(x, 0, z - 0.12),
+                    homeCell: [agent.position.x, agent.position.y],
+                    tasks: [], task: null, walkPhase: 0,
+                };
                 this.agents.set(agent.id, entry);
             }
             const bubble = state.activity[agent.id] || '';
@@ -401,6 +452,10 @@ class Office3D {
         for (const entry of this.agents.values()) {
             const p = entry.parts;
             const s = t + entry.seed;
+            if (this.runTask(entry, dt, t)) {
+                this.animateRing(entry, t);
+                continue;
+            }
             if (entry.status === 'working') {
                 entry.group.position.y = Math.abs(Math.sin(s * 8)) * 0.03;
                 p.armL.rotation.x = -0.9 + Math.sin(s * 16) * 0.25;
@@ -603,33 +658,358 @@ class Office3D {
         this.inFlightUntil = this.clock.elapsedTime + duration;
     }
 
-    // A reply arrived. Resolves when the hand-over has landed, so the speech
-    // bubble pops then (frame-driven, so it stays in step on slow machines).
-    onResponse({ agent, routedBy, filed, scheduled }) {
-        if (!this.animating) return Promise.resolve();
-        let landed;
-        const done = new Promise(resolve => { landed = resolve; });
-        let delay = Math.max(0, (this.inFlightUntil || 0) - this.clock.elapsedTime);
-        if (routedBy === 'classifier' && agent !== 'dispatcher') {
-            delay += this.flyPaper(this.anchor('dispatcher'), this.anchor(agent), this.agentColor(agent), { delay });
-        }
-        this.later(delay, () => {
-            landed();
-            this.burst(agent);
-            const from = this.anchor(agent);
-            if (filed && from) {
+    // A reply arrived: celebrate, then file the record / pass on the event.
+    onResponse({ agent, filed, scheduled }) {
+        if (!this.animating) return;
+        this.burst(agent);
+        const from = this.anchor(agent);
+        if (filed && from) {
+            if (FILERS.has(agent)) {
+                this.fileRecord(agent);
+            } else {
                 const shelf = this.nearestSpot('bookshelf', from);
                 if (shelf) this.flyPaper(from, new THREE.Vector3(shelf.x, 0.9, shelf.z - 0.25), this.agentColor(agent));
             }
-            if (scheduled && from) {
-                const to = agent === 'scheduler'
-                    ? (s => s && new THREE.Vector3(s.x, 0.9, s.z - 0.3))(this.nearestSpot('whiteboard', from))
-                    : this.anchor('scheduler');
-                if (to) this.flyPaper(from, to, '#e5b93a', { card: true });
+        }
+        if (scheduled && from) {
+            if (agent === 'scheduler') {
+                this.scheduleWrite();
+            } else {
+                const to = this.anchor('scheduler');
+                const d = to ? this.flyPaper(from, to, '#e5b93a', { card: true }) : 0;
+                this.later(d, () => this.scheduleWrite());
             }
-        });
-        return done;
+        }
     }
+
+    // ===== Walking staff =====
+    // A small task queue per staff member: go somewhere (path found on a
+    // half-tile grid that respects partitions, doorways and furniture), act
+    // there, carry a sheet, come back.
+
+    enqueue(id, tasks) {
+        const entry = this.agents.get(id);
+        if (entry) entry.tasks.push(...tasks);
+        return !!entry;
+    }
+
+    // While working: walk to the right furniture, do the job there, return.
+    startErrand(id) {
+        if (!this.animating || !ERRANDS[id]) return;
+        const tasks = [{ kind: 'wait' }];
+        for (const [spot, nth, name, dur] of ERRANDS[id]) {
+            tasks.push({ kind: 'goto', target: { spot, nth } }, { kind: 'act', name, dur });
+        }
+        tasks.push({ kind: 'goto', target: { home: true } });
+        this.enqueue(id, tasks);
+    }
+
+    // The dispatcher walks the task over. Resolves when it has been handed over.
+    deliver(fromId, toId) {
+        if (!this.animating || !this.agents.has(fromId) || !this.agents.has(toId)) return Promise.resolve();
+        return new Promise(resolve => {
+            let handed = false;
+            const done = () => { if (!handed) { handed = true; resolve(); } };
+            this.enqueue(fromId, [
+                { kind: 'wait' },
+                { kind: 'carry', on: true },
+                {
+                    kind: 'goto',
+                    target: { agent: toId },
+                    // No way through (furniture moved?): throw it instead.
+                    onFail: () => this.later(this.flyPaper(this.anchor(fromId), this.anchor(toId), this.agentColor(toId)), done),
+                },
+                { kind: 'act', name: 'hand', dur: 0.6 },
+                { kind: 'carry', on: false },
+                { kind: 'run', fn: done },
+                { kind: 'goto', target: { home: true } },
+            ]);
+        });
+    }
+
+    fileRecord(id) {
+        this.enqueue(id, [
+            { kind: 'carry', on: true },
+            { kind: 'goto', target: { spot: 'bookshelf', nth: 0 } },
+            { kind: 'act', name: 'file', dur: 0.9 },
+            { kind: 'carry', on: false },
+            { kind: 'goto', target: { home: true } },
+        ]);
+    }
+
+    scheduleWrite() {
+        this.enqueue('scheduler', [
+            { kind: 'goto', target: { spot: 'whiteboard', nth: 0 } },
+            { kind: 'act', name: 'write', dur: 1.8 },
+            { kind: 'goto', target: { home: true } },
+        ]);
+    }
+
+    // Runs the current task; returns true while the staff member is busy.
+    runTask(entry, dt, t) {
+        if (!entry.task) {
+            entry.task = entry.tasks.shift() || null;
+            if (!entry.task) return false;
+            this.beginTask(entry, entry.task);
+        }
+        if (this.stepTask(entry, entry.task, dt, t)) {
+            entry.task = null;
+            this.resetPose(entry);
+        }
+        return true;
+    }
+
+    beginTask(entry, task) {
+        if (task.kind === 'wait') {
+            // Don't leave before the task that is flying in has landed.
+            task.left = Math.max(0, (this.inFlightUntil || 0) - this.clock.elapsedTime);
+        } else if (task.kind === 'act') {
+            task.left = task.dur;
+        } else if (task.kind === 'goto') {
+            const plan = this.planRoute(entry, task.target);
+            if (!plan) {
+                task.points = [];
+                if (task.target.home) {
+                    entry.group.position.copy(entry.home);  // never strand anyone
+                } else {
+                    task.onFail?.();
+                }
+                task.face = task.target.home ? 0 : entry.group.rotation.y;
+            } else {
+                task.points = plan.points;
+                task.face = plan.face;
+            }
+        }
+    }
+
+    stepTask(entry, task, dt, t) {
+        const p = entry.parts;
+        switch (task.kind) {
+        case 'wait':
+            task.left -= dt;
+            return task.left <= 0;
+        case 'run':
+            task.fn();
+            return true;
+        case 'carry':
+            this.setCarrying(entry, task.on);
+            return true;
+        case 'act': {
+            task.left -= dt;
+            entry.group.position.y = 0;
+            if (task.name === 'search') {
+                p.armR.rotation.x = -2.3 + Math.sin(t * 6) * 0.35;
+                p.armL.rotation.x = -1.3 + Math.cos(t * 6) * 0.35;
+                p.head.rotation.y = Math.sin(t * 2.2) * 0.5;
+            } else if (task.name === 'write') {
+                p.armR.rotation.x = -1.9 + Math.sin(t * 9) * 0.15;
+                p.armR.rotation.z = Math.sin(t * 4) * 0.3;
+                p.head.rotation.y = Math.sin(t * 1.5) * 0.12;
+            } else if (task.name === 'file') {
+                p.armL.rotation.x = p.armR.rotation.x = -2.2 + Math.sin(t * 8) * 0.1;
+            } else {  // hand over
+                p.armL.rotation.x = p.armR.rotation.x = -1.4;
+            }
+            return task.left <= 0;
+        }
+        case 'goto': {
+            const g = entry.group;
+            let step = WALK_SPEED * dt;
+            while (step > 0 && task.points.length) {
+                const target = task.points[0];
+                const dx = target.x - g.position.x;
+                const dz = target.z - g.position.z;
+                const dist = Math.hypot(dx, dz);
+                if (dist < 1e-4) {
+                    task.points.shift();
+                    continue;
+                }
+                g.rotation.y = turnToward(g.rotation.y, Math.atan2(dx, dz), 0.35);
+                const move = Math.min(step, dist);
+                g.position.x += (dx / dist) * move;
+                g.position.z += (dz / dist) * move;
+                step -= move;
+                if (move >= dist) task.points.shift();
+            }
+            if (task.points.length) {
+                entry.walkPhase += dt * 11;
+                const swing = Math.sin(entry.walkPhase);
+                p.legL.rotation.x = swing * 0.6;
+                p.legR.rotation.x = -swing * 0.6;
+                if (entry.carrying) {
+                    p.armL.rotation.x = p.armR.rotation.x = -1.0;
+                } else {
+                    p.armL.rotation.x = -swing * 0.5;
+                    p.armR.rotation.x = swing * 0.5;
+                }
+                g.position.y = Math.abs(swing) * 0.035;
+                return false;
+            }
+            g.rotation.y = task.face;
+            return true;
+        }
+        default:
+            return true;
+        }
+    }
+
+    resetPose(entry) {
+        const p = entry.parts;
+        p.legL.rotation.x = p.legR.rotation.x = 0;
+        p.armL.rotation.x = p.armR.rotation.x = 0;
+        p.armR.rotation.z = 0;
+        p.head.rotation.y = 0;
+        entry.group.position.y = 0;
+    }
+
+    setCarrying(entry, on) {
+        if (on && !entry.paper) {
+            entry.paper = new THREE.Group();
+            entry.paper.add(box(0.3, 0.03, 0.38, 0xffffff));
+            const band = box(0.3, 0.04, 0.08, new THREE.Color(entry.color).getHex());
+            band.position.z = -0.15;
+            entry.paper.add(band);
+            entry.paper.position.set(0, 0.5, 0.26);
+            entry.paper.rotation.x = -0.5;
+            entry.group.add(entry.paper);
+        }
+        if (entry.paper) entry.paper.visible = on;
+        entry.carrying = on;
+    }
+
+    // --- path finding on a half-tile grid ---
+
+    navSize() {
+        const { cols, rows } = this.ctx.getState().office.grid;
+        return { cols, rows, w: cols * 2, h: rows * 2 };
+    }
+
+    nodeCenter(sx, sy) {
+        const { cols, rows } = this.navSize();
+        return new THREE.Vector3((sx + 0.5) * SUB - cols / 2, 0, (sy + 0.5) * SUB - rows / 2);
+    }
+
+    nodeAt(pos) {
+        const { cols, rows, w, h } = this.navSize();
+        const sx = Math.min(w - 1, Math.max(0, Math.floor((pos.x + cols / 2) / SUB)));
+        const sy = Math.min(h - 1, Math.max(0, Math.floor((pos.z + rows / 2) / SUB)));
+        return [sx, sy];
+    }
+
+    // Furniture and the other staff standing at their desks block the way.
+    blockedGrid(moverEntry) {
+        const { w, h } = this.navSize();
+        const blocked = new Uint8Array(w * h);
+        const mark = (sx, sy) => { blocked[sy * w + sx] = 1; };
+        for (const spot of this.spots) {
+            if (spot.type === 'rug') continue;
+            const [c, r] = spot.cell;
+            if (spot.seat) {  // desk in the front half, the person in the back half
+                mark(2 * c, 2 * r + 1);
+                mark(2 * c + 1, 2 * r + 1);
+            } else {
+                mark(2 * c, 2 * r); mark(2 * c + 1, 2 * r);
+                mark(2 * c, 2 * r + 1); mark(2 * c + 1, 2 * r + 1);
+            }
+        }
+        for (const other of this.agents.values()) {
+            if (other === moverEntry) continue;
+            const [c, r] = other.homeCell;
+            mark(2 * c, 2 * r);
+            mark(2 * c + 1, 2 * r);
+        }
+        return blocked;
+    }
+
+    // Can you step between two adjacent nodes without walking through a partition?
+    crossable(ax, ay, bx, by) {
+        const { cols } = this.navSize();
+        const ca = ax >> 1, ra = ay >> 1, cb = bx >> 1, rb = by >> 1;
+        if (ca === cb && ra === rb) return true;
+        if (this.roomGrid[ra * cols + ca] === this.roomGrid[rb * cols + cb]) return true;
+        return ca !== cb
+            ? this.doors.has(`v${Math.min(ca, cb)},${ra}`)
+            : this.doors.has(`h${ca},${Math.min(ra, rb)}`);
+    }
+
+    findPath(start, isGoal, blocked) {
+        const { w, h } = this.navSize();
+        const startIdx = start[1] * w + start[0];
+        const prev = new Int32Array(w * h).fill(-1);
+        prev[startIdx] = startIdx;
+        const queue = [startIdx];
+        for (let qi = 0; qi < queue.length; qi++) {
+            const idx = queue[qi];
+            const x = idx % w, y = (idx / w) | 0;
+            if (isGoal(x, y)) {
+                const path = [];
+                for (let i = idx; i !== startIdx; i = prev[i]) path.push([i % w, (i / w) | 0]);
+                return path.reverse();
+            }
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                const n = ny * w + nx;
+                if (prev[n] !== -1 || blocked[n] || !this.crossable(x, y, nx, ny)) continue;
+                prev[n] = idx;
+                queue.push(n);
+            }
+        }
+        return null;
+    }
+
+    // Free node next to (and not walled off from) a given floor tile.
+    nextToCell(tc, tr, blocked) {
+        const { w } = this.navSize();
+        return (x, y) => {
+            if ((x >> 1) === tc && (y >> 1) === tr) return false;
+            if (blocked[y * w + x]) return false;
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nx = x + dx, ny = y + dy;
+                if ((nx >> 1) === tc && (ny >> 1) === tr && this.crossable(x, y, nx, ny)) return true;
+            }
+            return false;
+        };
+    }
+
+    planRoute(entry, target) {
+        if (!this.doors || !this.roomGrid) return null;
+        const blocked = this.blockedGrid(entry);
+        const start = this.nodeAt(entry.group.position);
+        const route = (isGoal, faceCell) => {
+            const nodes = this.findPath(start, isGoal, blocked);
+            if (!nodes) return null;
+            const points = nodes.map(([x, y]) => this.nodeCenter(x, y));
+            const last = points[points.length - 1] || entry.group.position.clone();
+            let face = 0;
+            if (faceCell) {
+                const [fx, fz] = this.cellCenter(faceCell[0], faceCell[1]);
+                face = Math.atan2(fx - last.x, fz - last.z);
+            }
+            return { points, face };
+        };
+        if (target.home) {
+            const goal = this.nodeAt(entry.home);
+            const plan = route((x, y) => x === goal[0] && y === goal[1]);
+            if (plan) plan.points.push(entry.home.clone());
+            return plan;
+        }
+        if (target.agent) {
+            const other = this.agents.get(target.agent);
+            return other ? route(this.nextToCell(...other.homeCell, blocked), other.homeCell) : null;
+        }
+        // nth nearest piece of furniture of that type that can be reached
+        const from = entry.group.position;
+        const spots = this.spots
+            .filter(sp => sp.type === target.spot)
+            .sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z));
+        for (const spot of spots.slice(target.nth || 0).concat(spots.slice(0, target.nth || 0))) {
+            const plan = route(this.nextToCell(...spot.cell, blocked), spot.cell);
+            if (plan) return plan;
+        }
+        return null;
+    }
+
 
     resize() {
         const { clientWidth: w, clientHeight: h } = this.container;

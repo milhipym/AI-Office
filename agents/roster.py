@@ -59,7 +59,7 @@ ROOMS = [
 FURNITURE = {
     "0,0": "plant", "1,1": "desk", "2,0": "coffee", "1,2": "desk", "2,2": "desk",
     "3,0": "bookshelf", "4,1": "desk", "5,1": "monitor", "5,0": "bookshelf",
-    "6,0": "whiteboard", "7,1": "desk", "8,1": "chair", "6,2": "plant",
+    "6,0": "whiteboard", "7,1": "desk", "8,1": "chair", "8,0": "plant",
     "0,3": "bookshelf", "1,4": "desk", "2,3": "bookshelf", "3,4": "desk", "2,5": "desk",
     "4,5": "plant", "0,5": "lamp",
     "6,4": "monitor", "7,4": "desk", "8,3": "lamp", "6,5": "sofa",

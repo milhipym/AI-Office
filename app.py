@@ -11,9 +11,9 @@ from datetime import datetime
 from flask import Flask, Response, jsonify, render_template, request
 
 import config
-from agents import roster
+from agents import AGENTS, roster
 from agents.brain_agents import reembed_stale
-from agents.router import dispatch, is_smalltalk
+from agents.router import COMMAND_RE, dispatch, is_smalltalk
 from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
 from services import brain_store, ics, storage
 from services.text import strip_emoji
@@ -74,13 +74,33 @@ def get_chat():
     return jsonify(storage.load_history())
 
 
+@app.route("/api/route", methods=["POST"])
+def route_message():
+    """Decide who handles a message without running it.
+
+    The office shows the dispatcher carrying the task to that staff member
+    while /api/chat (called with the returned agent) does the work, so the
+    classifier still runs only once per message.
+    """
+    message = ((request.json or {}).get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+    if is_smalltalk(message):
+        return jsonify({"agent": "dispatcher", "routed_by": "smalltalk"})
+    agent, _, routed_by = dispatch(message)
+    return jsonify({"agent": agent.id, "routed_by": routed_by})
+
+
 @app.route("/api/chat", methods=["POST"])
 def send_message():
     data = request.json or {}
     user_message = (data.get("message") or "").strip()
+    preassigned = data.get("agent")
 
     if not user_message:
         return jsonify({"error": "Empty message"}), 400
+    if preassigned is not None and preassigned not in AGENTS:
+        return jsonify({"error": "Unknown agent"}), 400
 
     user_msg_record = {
         "agent": "user",
@@ -91,7 +111,7 @@ def send_message():
     storage.append_message(user_msg_record)
 
     # Smalltalk bypass — no LLM call for pure greetings
-    if is_smalltalk(user_message):
+    if not preassigned and is_smalltalk(user_message):
         ai_msg_record = {
             "agent": "dispatcher",
             "message": random.choice(SMALLTALK_REPLIES),
@@ -105,7 +125,11 @@ def send_message():
         storage.append_message(ai_msg_record)
         return jsonify({"user_message": user_msg_record, "ai_response": ai_msg_record})
 
-    agent, cleaned_message, routed_by = dispatch(user_message)
+    if preassigned and not COMMAND_RE.match(user_message):
+        # Already routed by /api/route: don't classify a second time.
+        agent, cleaned_message, routed_by = AGENTS[preassigned], user_message, "preassigned"
+    else:
+        agent, cleaned_message, routed_by = dispatch(user_message)
 
     # Recent history for context (excluding the message we just added)
     history = storage.load_history()[:-1]
