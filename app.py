@@ -6,7 +6,10 @@ Teams, rooms and staff are defined in agents/roster.py.
 """
 
 import random
+import threading
+import webbrowser
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, render_template, request
 
@@ -16,6 +19,7 @@ from agents.brain_agents import reembed_stale
 from agents.router import COMMAND_RE, dispatch, is_smalltalk
 from config import FLASK_DEBUG, FLASK_HOST, FLASK_PORT, is_openai_configured
 from services import brain_store, ics, storage
+from services.backup import backup_db
 from services.text import strip_emoji
 from services.openai_client import OpenAIError
 
@@ -28,6 +32,35 @@ SMALLTALK_REPLIES = [
 ]
 
 app = Flask(__name__)
+
+# The server only answers to loopback names. A web page you visit can point
+# its own domain at 127.0.0.1 (DNS rebinding) and then read this API as
+# same-origin; its requests still carry that domain in Host, so they stop here.
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1", FLASK_HOST}
+
+
+def _hostname(value: str) -> str:
+    return (urlsplit(f"//{value}").hostname or "") if value else ""
+
+
+@app.before_request
+def reject_foreign_hosts():
+    if _hostname(request.host) not in ALLOWED_HOSTS:
+        return jsonify({"error": "Forbidden host"}), 403
+    # Another site's page calling this API (Origin is sent on cross-site
+    # POST/DELETE). Pages served here have a loopback origin; "null" comes
+    # from sandboxed frames and local files, which have no business here.
+    origin = request.headers.get("Origin")
+    if origin and urlsplit(origin).hostname not in ALLOWED_HOSTS:
+        return jsonify({"error": "Forbidden origin"}), 403
+
+
+@app.after_request
+def security_headers(resp):
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    return resp
 
 
 def staff_display(staff: dict) -> dict:
@@ -291,4 +324,11 @@ if __name__ == "__main__":
         print("   Copy .env.example to .env and add your key.")
         print("   The app will still run, but agents will return placeholders.")
         print("=" * 60)
+    copy = backup_db(config.BRAIN_DB_FILE, config.BACKUP_DIR, config.BACKUP_KEEP)
+    if copy:
+        print(f"Backed up records to {copy}")
+    url = f"http://{'127.0.0.1' if FLASK_HOST in ('0.0.0.0', '::') else FLASK_HOST}:{FLASK_PORT}"
+    print(f"AI Office: {url}  (close this window to stop)")
+    if config.OPEN_BROWSER:
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
     app.run(debug=FLASK_DEBUG, host=FLASK_HOST, port=FLASK_PORT)

@@ -15,6 +15,7 @@ from config import (
     OPENAI_MODEL,
     is_openai_configured,
 )
+from services.privacy import mask
 
 _client = None
 
@@ -64,6 +65,11 @@ def chat_completion(
             role = "user" if h.get("agent") == "user" else "assistant"
             messages.append({"role": role, "content": h.get("message", "")})
     messages.append({"role": "user", "content": user_message})
+    # The system prompt carries stored records too, so mask every message.
+    masked = 0
+    for m in messages:
+        m["content"], n = mask(m["content"])
+        masked += n
 
     start = time.time()
     try:
@@ -82,6 +88,7 @@ def chat_completion(
         "model": resp.model,
         "tokens": resp.usage.total_tokens if resp.usage else 0,
         "latency_ms": latency_ms,
+        "masked": masked,
     }
 
 
@@ -113,6 +120,7 @@ def embed(texts: list, model: Optional[str] = None) -> list:
         raise OpenAIError("OpenAI client is not configured. Set OPENAI_API_KEY in .env")
     if not texts:
         return []
+    texts = [mask(t)[0] for t in texts]
     try:
         resp = client.embeddings.create(model=model or EMBEDDING_MODEL, input=texts)
     except Exception as e:
@@ -133,7 +141,7 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     try:
         resp = client.images.generate(
             model=OPENAI_IMAGE_MODEL,
-            prompt=prompt,
+            prompt=mask(prompt)[0],
             size=size,
             quality="standard",
             n=1,
@@ -165,7 +173,7 @@ def web_search_response(query: str) -> dict:
         resp = client.responses.create(
             model=OPENAI_MODEL,
             tools=[{"type": "web_search"}],
-            input=query,
+            input=mask(query)[0],
         )
     except Exception as e:
         # Fallback: regular chat completion if Responses API not available

@@ -54,9 +54,19 @@ FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 FLASK_HOST = os.getenv("FLASK_HOST", "127.0.0.1")
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 
+# Open the office in the default browser once the server is up (start.bat).
+OPEN_BROWSER = os.getenv("OPEN_BROWSER", "false").lower() == "true"
+
+# Privacy: personal data patterns are masked before any OpenAI call
+# (services/privacy.py). Extra regexes, e.g. policy numbers, separated by "||".
+MASK_PERSONAL_DATA = os.getenv("MASK_PERSONAL_DATA", "true").lower() != "false"
+MASK_EXTRA_PATTERNS = [p for p in os.getenv("MASK_EXTRA_PATTERNS", "").split("||") if p.strip()]
+
 # Storage
 CHAT_HISTORY_FILE = DATA_DIR / "chat_history.json"
 BRAIN_DB_FILE = DATA_DIR / "brain.db"
+BACKUP_DIR = DATA_DIR / "backups"
+BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "14"))  # daily copies of brain.db
 
 
 def is_openai_configured() -> bool:

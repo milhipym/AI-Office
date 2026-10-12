@@ -24,3 +24,6 @@ env/
 
 # Second brain
 data/brain.db
+
+# Daily copies of brain.db (services/backup.py)
+data/backups/
