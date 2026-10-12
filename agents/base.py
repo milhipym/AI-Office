@@ -85,7 +85,7 @@ class BaseAgent(ABC):
         """Return a standard fallback message when the API is unavailable."""
         return AgentResponse(
             text=(
-                f"⚠️ **{self.name}** 에이전트를 사용할 수 없습니다.\n\n"
+                f"**{self.name}** 에이전트를 사용할 수 없습니다.\n\n"
                 f"**원인:** {reason}\n\n"
                 "`.env` 파일에 `OPENAI_API_KEY`를 설정한 뒤 서버를 재시작하세요."
             ),

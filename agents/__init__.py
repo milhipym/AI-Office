@@ -1,22 +1,20 @@
-"""AI agent definitions and registry."""
+"""AI agent registry. Display data for each agent lives in agents/roster.py."""
 
-from .claude_opus import ClaudeOpusAgent
-from .claude_sonnet import ClaudeSonnetAgent
-from .manus import ManusAgent
-from .gemini import GeminiAgent
-from .chatgpt import ChatGPTAgent
-from .perplexity import PerplexityAgent
+from .assistant import AssistantAgent
+from .brain_agents import ArchivistAgent, CoachAgent, FinderAgent, MinutesAgent, ReporterAgent
+from .schedule import SchedulerAgent
 
 AGENTS = {
-    "claude": ClaudeOpusAgent(),
-    "opus": ClaudeOpusAgent(),  # alias
-    "sonnet": ClaudeSonnetAgent(),
-    "manus": ManusAgent(),
-    "gemini": GeminiAgent(),
-    "chatgpt": ChatGPTAgent(),
-    "gpt": ChatGPTAgent(),  # alias
-    "perplexity": PerplexityAgent(),
-    "ppl": PerplexityAgent(),  # alias
+    agent.id: agent
+    for agent in (
+        AssistantAgent(),
+        SchedulerAgent(),
+        ArchivistAgent(),
+        MinutesAgent(),
+        FinderAgent(),
+        ReporterAgent(),
+        CoachAgent(),
+    )
 }
 
 __all__ = ["AGENTS"]
